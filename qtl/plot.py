@@ -6,8 +6,10 @@ import matplotlib.ticker as ticker
 from matplotlib.colors import hsv_to_rgb
 import seaborn as sns
 import scipy.cluster.hierarchy as hierarchy
+from cycler import cycler
 
-from . import stats, plot
+from . import stats
+from . import map as qtl_map
 
 
 def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25]):
@@ -75,6 +77,7 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             ylabel='Normalized expression', title=None, genotype_counts=None):
 
     if covariates_df is not None:
+        # only residualize the phenotype for plotting
         p = stats.residualize(p.copy(), covariates_df.loc[p.index])
 
     eqtl_df = pd.concat([g, p], axis=1)
@@ -148,6 +151,86 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             ])
 
     return ax
+
+
+def plot_interaction(p, g, i, variant_id, annot, covariates_df=None, lowess=None,
+                     xlabel=None, ylabel=None, title=None, alpha=0.8, s=20):
+    """
+    Plot interaction QTL
+
+    Model:
+      p = b0 + b1*g + b2*i + b3*gi
+
+    Args:
+      lowess: fraction of data to use [0,1]
+    """
+
+    assert np.all(p.index==g.index) and np.all(p.index==i.index)
+
+    if covariates_df is not None:
+        assert np.all(p.index==covariates_df.index)
+        X = np.c_[len(g)*[1],g,i,g*i,covariates_df]
+    else:
+        X = np.c_[len(g)*[1],g,i,g*i]
+    b,_,_,_ = np.linalg.lstsq(X, p, rcond=None)
+
+    ref, alt = variant_id.split('_')[2:4]
+    labels = {
+        0:'{0}/{0}'.format(ref),
+        1:'{}/{}'.format(ref, alt),
+        2:'{0}/{0}'.format(alt),
+    }
+
+    ax = setup_figure(3,3)
+    ax.margins(0.02)
+
+    custom_cycler = cycler('color', [
+        # hsv_to_rgb([0.55,1,0.8]),
+        # sns.color_palette("Paired")[7],  # orange
+        # hsv_to_rgb([0,1,0.8]),
+        sns.color_palette("husl", 8)[5], # blue
+        sns.color_palette("Paired")[7],  # orange
+        sns.color_palette("Paired")[3],  # green
+    ])
+    ax.set_prop_cycle(custom_cycler)
+
+    gorder = [0,1,2]
+    # gorder = [2,1,0]
+    # mu = [p[g==g0].mean() for g0 in np.unique(g)]
+    # if mu[0]<mu[2]:
+    #     gorder = gorder[::-1]
+    for d in gorder:
+        ix = g[g==d].index
+        ax.scatter(i[ix], p[ix], s=s, alpha=alpha, edgecolor='none', label=labels[d], clip_on=False)
+        if lowess is not None:
+            lw = sm.nonparametric.lowess(p[ix], i[ix], lowess)
+            ax.plot(lw[:, 0], lw[:, 1], '--', lw=2)
+    format_plot(ax, fontsize=12)
+    xlim = np.array(ax.get_xlim())
+    for d in gorder:  # regression lines
+        y = lambda x: b[0] + b[1]*d + b[2]*x + b[3]*d*x
+        ax.plot(xlim, y(xlim), '-', lw=1.5)
+
+    leg = ax.legend(fontsize=12, labelspacing=0.25, handletextpad=0, borderaxespad=0, handlelength=1.5)
+    for lh in leg.legendHandles:
+        lh.set_alpha(1)
+
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=3, integer=True, nbins=4))
+    ax.yaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=3, integer=True, nbins=4))
+
+    if xlabel is None:
+        xlabel = i.name
+    if ylabel is None:
+        ylabel = annot.get_gene(p.name).name
+    ax.set_xlabel(xlabel, fontsize=14)
+    ax.set_ylabel(ylabel, fontsize=14)
+    if title is None:
+        title = variant_id
+    ax.set_title(title, fontsize=12)
+    ax.spines['bottom'].set_position(('outward', 6))
+    ax.spines['left'].set_position(('outward', 6))
+    ax.spines['bottom'].set_smart_bounds(True)
+    ax.spines['left'].set_smart_bounds(True)
 
 
 def plot_effects(dfs, args, ax=None,

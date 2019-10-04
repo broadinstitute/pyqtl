@@ -1,2 +1,1 @@
-__version__ = "0.1.0"
-# from .tensorqtl import *
+__version__ = "0.1.1"

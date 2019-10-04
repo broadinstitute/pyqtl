@@ -119,12 +119,13 @@ def impute_mean(df, verbose=True):
             print('\r  * parsed {} sites'.format(k), end='')
     if verbose:
         print('\r  * parsed {} sites'.format(k))
-        print('  * imputed at least 1 sample in {} sites'.format(n))
+        if n>0:
+            print('  * imputed at least 1 sample in {} sites'.format(n))
 
 
 def get_genotype(variant_id, vcf, field='GT', convert_gt=True, sample_ids=None):
     """
-
+    Parse genotypes for given variant from VCF. Requires tabix.
 
       variant_id: {chr}_{pos}_{ref}_{alt}_{build}
       vcf:        vcf path
