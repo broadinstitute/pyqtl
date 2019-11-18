@@ -303,12 +303,11 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None,
     for k,ax in enumerate(axes):
         ax.margins(y=0.2)
         if ymax is None:
-            ymax = ax.get_ylim()[1]
-            ax.set_ylim([0, ymax])
+            ax.set_ylim([0, ax.get_ylim()[1]])
         else:
             ax.set_ylim([0, ymax[k]])
         if shade_range is not None:  # highlight subregion with gray background
-            ax.add_patch(patches.Rectangle((shade_range[0], 0), np.diff(shade_range), ymax, facecolor=[0.66]*3, zorder=-10))
+            ax.add_patch(patches.Rectangle((shade_range[0], 0), np.diff(shade_range), ax.get_ylim()[1], facecolor=[0.66]*3, zorder=-10))
 
     if labels is not None:
         for ax,t in zip(axes, labels):
@@ -491,7 +490,7 @@ if __name__=='__main__':
     pos = int(pos)
 
     print('Loading genotypes and computing LD')
-    r2_s = compute_ld(args.vcf, variant_id, args.phenotype_bed)
+    r2_s = get_ld(args.vcf, variant_id, args.phenotype_bed)
 
     rs_id = args.rs_id
     if rs_id is None and args.id_lookup_table is not None:
@@ -499,8 +498,10 @@ if __name__=='__main__':
         rs_id = get_rsid(args.id_lookup_table, variant_id)
 
     print('Generating plot')
-    plot_locus([gwas_df, eqtl_df, ieqtl_df], r2_s, args.gene_id, variant_id, annot,
-               rs_id=rs_id, labels=[i.encode('utf-8').decode('unicode_escape') for i in args.labels], window=args.window)
+    plot_locus([gwas_df, eqtl_df, ieqtl_df], args.gene_id, variant_id, annot, r2_s=r2_s,
+               rs_id=rs_id, labels=[i.encode('utf-8').decode('unicode_escape') for i in args.labels],
+               window=args.window, shared_only=True)
+
     pdf_file = os.path.join(args.output_dir, '{}.{}.locus_plot.pdf'.format(gene.name, variant_id))
     plt.savefig(pdf_file)
 
