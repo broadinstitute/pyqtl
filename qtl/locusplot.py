@@ -269,7 +269,7 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None,
     # plot p-values
     for ax,variant_id,pval_df in zip(axes, variant_ids, pvals):
         # select variants in window
-        m = (pval_df['position']>=pos-window) & (pval_df['position']<=pos+window)
+        m = (pval_df['position']>=xlim[0]) & (pval_df['position']<=xlim[1])
         if shared_only:
             m &= pval_df.index.isin(common_ix)
         window_df = pval_df.loc[m]
@@ -292,7 +292,11 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None,
             t = rs_id
         else:
             t = variant_id
-        txt = ax.annotate(t, (minpos, -np.log10(minp)), xytext=(5,5), textcoords='offset points')
+
+        if (minpos-xlim[0])/(xlim[1]-xlim[0]) < 0.55:
+            txt = ax.annotate(t, (minpos, -np.log10(minp)), xytext=(5,5), textcoords='offset points')
+        else:
+            txt = ax.annotate(t, (minpos, -np.log10(minp)), xytext=(-5,5), ha='right', textcoords='offset points')
         if -np.log10(minp) < -np.log10(pval_df['pval_nominal'].min())*0.8:
             txt.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
         if highlight_ids is not None:
@@ -346,7 +350,7 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None,
             tss = gene.start_pos
         else:
             tss = gene.end_pos
-        if gene.end_pos<pos-window:
+        if gene.end_pos < xlim[0]:
             x = dg/aw/2
             v = np.array([[x,0.2], [x-0.8*dg/aw, 0.5], [x,0.8]])
             polygon = patches.Polygon(v, True, color='k', transform=gax.transAxes, clip_on=False)
@@ -354,7 +358,7 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None,
             txt = '{} (~{:.1f}Mb)'.format(gene.name, (pos-tss)/1e6)
             gax.set_ylim([-1,1])
             gax.text(1.5*x, 0.5, txt, va='center', ha='left', transform=gax.transAxes)
-        elif gene.start_pos>pos+window:
+        elif gene.start_pos > xlim[1]:
             x = 1 - dg/aw/2
             v = np.array([[x,0.2], [x+0.8*dg/aw, 0.5], [x,0.8]])
             polygon = patches.Polygon(v, True, color='k', transform=gax.transAxes, clip_on=False)
@@ -365,9 +369,9 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None,
         else:
             gene.plot(ax=gax, max_intron=1e9, fc='k', ec='none', reference=1, scale=0.33, show_ylabels=False, clip_on=True)
             if gene_label_pos=='right':
-                gax.annotate(gene.name, (np.minimum(gene.end_pos, pos+window), 0), xytext=(5,0), textcoords='offset points', va='center', ha='left')
+                gax.annotate(gene.name, (np.minimum(gene.end_pos, xlim[1]), 0), xytext=(5,0), textcoords='offset points', va='center', ha='left')
             else:
-                gax.annotate(gene.name, (np.maximum(gene.start_pos, pos-window), 0), xytext=(-5,0), textcoords='offset points', va='center', ha='right')
+                gax.annotate(gene.name, (np.maximum(gene.start_pos, xlim[0]), 0), xytext=(-5,0), textcoords='offset points', va='center', ha='right')
 
         if chr_label_pos=='bottom':
             gax.set_xlabel('Position on {} (Mb)'.format(chrom), fontsize=14)

@@ -75,6 +75,8 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
     df = pd.DataFrame(pval, index=tstat2.index, columns=['pval_nominal'])
     df['slope'] = r * n
     df['slope_se'] = df['slope'].abs() / np.sqrt(tstat2)
+    df['r2'] = r*r
+    df['tstat'] = np.sqrt(tstat2)
     df['maf'] = genotype_df.sum(1) / (2*genotype_df.shape[1])
     df['maf'] = np.where(df['maf']<=0.5, df['maf'], 1-df['maf'])
     df['chr'] = df.index.map(lambda x: x.split('_')[0])
@@ -85,10 +87,9 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
     return df
 
 
-def calculate_interaction(genotype_s, phenotype_s, interaction_s, covariates_df, impute=True):
+def calculate_interaction(genotype_s, phenotype_s, interaction_s, covariates_df=None, impute=True):
 
     assert np.all(genotype_s.index==interaction_s.index)
-    dof = phenotype_s.shape[0] - covariates_df.shape[1] - 4
 
     # impute missing genotypes
     if impute:
@@ -103,12 +104,15 @@ def calculate_interaction(genotype_s, phenotype_s, interaction_s, covariates_df,
     i0 = interaction_s - interaction_s.mean()
     p0 = phenotype_s - phenotype_s.mean()
 
+    dof = phenotype_s.shape[0] - 4
     # residualize
-    r = stats.Residualizer(covariates_df)
-    g0 =  r.transform(g0.values.reshape(1,-1), center=False)
-    gi0 = r.transform(gi0.values.reshape(1,-1), center=False)
-    p0 =  r.transform(p0.values.reshape(1,-1), center=False)
-    i0 =  r.transform(i0.values.reshape(1,-1), center=False)
+    if covariates_df is not None:
+        r = stats.Residualizer(covariates_df)
+        g0 =  r.transform(g0.values.reshape(1,-1), center=False)
+        gi0 = r.transform(gi0.values.reshape(1,-1), center=False)
+        p0 =  r.transform(p0.values.reshape(1,-1), center=False)
+        i0 =  r.transform(i0.values.reshape(1,-1), center=False)
+        dof -= covariates_df.shape[1]
 
     # regression
     X = np.r_[g0, i0, gi0].T

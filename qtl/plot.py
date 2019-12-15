@@ -74,7 +74,7 @@ def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
 def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=None, covariates_df=None,
             legend_text=None, normalized=False, loc=None, ax=None, color=[0.5]*3,
             variant_id=None, jitter=0, bvec=None, boxplot=False, xlabel=None,
-            ylabel='Normalized expression', title=None, genotype_counts=None):
+            ylabel='Normalized expression', title=None, show_counts=True):
 
     if covariates_df is not None:
         # only residualize the phenotype for plotting
@@ -86,7 +86,7 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
         eqtl_df = pd.concat([eqtl_df, label_s], axis=1, sort=False)
 
     if ax is None:
-        ax = plot.setup_figure(2, 2, yspace=[0.75, 0.25])
+        ax = setup_figure(2, 2, yspace=[0.75, 0.25])
     ax.spines['bottom'].set_position(('outward', 4))
     ax.spines['left'].set_position(('outward', 4))
 
@@ -131,12 +131,19 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
     if variant_id is not None:
         ref,alt = variant_id.split('_')[2:4]
         if not split:
-            gcounts = g.astype(int).value_counts()
-            ax.set_xticklabels([
-                '{0}/{0}\n({1})'.format(ref, gcounts[0]),
-                '{0}/{1}\n({2})'.format(ref, alt, gcounts[1]),
-                '{0}/{0}\n({1})'.format(alt, gcounts[2]),
-            ])
+            if show_counts:
+                gcounts = g.astype(int).value_counts()
+                ax.set_xticklabels([
+                    '{0}/{0}\n({1})'.format(ref, gcounts.get(0, 0)),
+                    '{0}/{1}\n({2})'.format(ref, alt, gcounts.get(1, 0)),
+                    '{0}/{0}\n({1})'.format(alt, gcounts.get(2, 0)),
+                ])
+            else:
+                ax.set_xticklabels([
+                    '{0}/{0}'.format(ref),
+                    '{0}/{1}'.format(ref, alt),
+                    '{0}/{0}'.format(alt),
+                ])
         else:
             var_s = eqtl_df[eqtl_df.columns[2]]
             c = sorted(var_s.unique())
@@ -154,7 +161,7 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
 
 
 def plot_interaction(p, g, i, variant_id, annot, covariates_df=None, lowess=None,
-                     xlabel=None, ylabel=None, title=None, alpha=0.8, s=20):
+                     xlabel=None, ylabel=None, title=None, alpha=0.8, s=20, fontsize=14):
     """
     Plot interaction QTL
 
@@ -222,11 +229,11 @@ def plot_interaction(p, g, i, variant_id, annot, covariates_df=None, lowess=None
         xlabel = i.name
     if ylabel is None:
         ylabel = annot.get_gene(p.name).name
-    ax.set_xlabel(xlabel, fontsize=14)
-    ax.set_ylabel(ylabel, fontsize=14)
+    ax.set_xlabel(xlabel, fontsize=fontsize)
+    ax.set_ylabel(ylabel, fontsize=fontsize)
     if title is None:
         title = variant_id
-    ax.set_title(title, fontsize=12)
+    ax.set_title(title, fontsize=fontsize)
     ax.spines['bottom'].set_position(('outward', 6))
     ax.spines['left'].set_position(('outward', 6))
     ax.spines['bottom'].set_smart_bounds(True)
@@ -299,16 +306,19 @@ def plot_effects(dfs, args, ax=None,
     return ax
 
 
-def clustermap(df, Z=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.Blues,
+def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.Blues,
                origin='lower', dendrogram_pos='top',
                fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar_orientation='vertical',
-               method='average', metric='euclidean', optimal_ordering=False,
+               method='average', metric='euclidean', optimal_ordering=False, value_labels=False,
                rotation=-45, ha='left', va='top', tri=False,
                dl=1, dr=1, dt=0.2,
                db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.2, dc=0.15):
 
-    if Z is None:
-        Z = hierarchy.linkage(df, method=method, metric=metric, optimal_ordering=optimal_ordering)
+    if Zx is None:
+        Zy = hierarchy.linkage(df,   method=method, metric=metric, optimal_ordering=optimal_ordering)
+        Zx = hierarchy.linkage(df.T, method=method, metric=metric, optimal_ordering=optimal_ordering)
+    elif Zy is None:
+        Zy = Zx
 
     fw = dl+aw+dr
     fh = db+ah+dd+ds+dt
@@ -323,10 +333,11 @@ def clustermap(df, Z=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.B
         ax =  fig.add_axes([dl/fw, (db+dd+ds)/fh, aw/fw, ah/fh])
         cax = fig.add_axes([(dl+aw+dc)/fw, (db+dd+ds)/fh, cw/fw, ch/fh])
 
-    if Z is not None:
+    if Zx is not None:
         with plt.rc_context({'lines.linewidth': lw}):
-            z = hierarchy.dendrogram(Z, ax=dax,  orientation='top', link_color_func=lambda k: 'k')
-        ix = df.columns[hierarchy.leaves_list(Z)]
+            z = hierarchy.dendrogram(Zx, ax=dax,  orientation='top', link_color_func=lambda k: 'k')
+        ix = df.columns[hierarchy.leaves_list(Zx)]
+        iy = df.index[hierarchy.leaves_list(Zy)]
     else:
         ix = df.columns
     dax.axis('off')
@@ -334,18 +345,27 @@ def clustermap(df, Z=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.B
     if dendrogram_pos=='bottom':
         dax.invert_yaxis()
 
-    df = df.loc[ix, ix].copy()
+    df = df.loc[iy, ix].copy()
     if tri:
         if dendrogram_pos=='top':
             df.values[np.triu_indices(df.shape[0])] = np.NaN
         elif dendrogram_pos=='bottom':
             df.values[np.tril_indices(df.shape[0])] = np.NaN
 
-    h = ax.imshow(df, origin=origin, cmap=cmap, vmin=vmin, vmax=vmax)
+
+    if value_labels:
+        irange = np.arange(df.shape[0])
+        jrange = np.arange(df.shape[1])
+        for i in irange:
+            for j in jrange:
+                if not np.isnan(df.values[j,i]):
+                    ax.text(i, j, '{:.2f}'.format(df.values[j,i]), ha='center', va='center')
+
+    h = ax.imshow(df, origin=origin, cmap=cmap, vmin=vmin, vmax=vmax, aspect='auto')
     ax.set_xticks(np.arange(df.shape[1]))
-    ax.set_yticks(np.arange(df.shape[1]))
+    ax.set_yticks(np.arange(df.shape[0]))
     ax.set_xticklabels(ix, rotation=rotation, fontsize=fontsize, ha=ha, va=va)
-    ax.set_yticklabels(ix, fontsize=fontsize)
+    ax.set_yticklabels(iy, fontsize=fontsize)
 
     if dendrogram_pos=='bottom':
         ax.yaxis.tick_right()
@@ -354,11 +374,18 @@ def clustermap(df, Z=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.B
 
     if label_colors is not None:
         s = 1.015
-        xlim = ax.get_xlim()
-        b = xlim[1] - s*np.diff(xlim)
-        ax.set_xlim(xlim)
-        ax.scatter([b]*df.shape[0], np.arange(df.shape[0]), s=48, c=label_colors[hierarchy.leaves_list(Z)], clip_on=False)
-        ax.tick_params(axis='y', pad=12)
+        # xlim = ax.get_xlim()
+        # b = xlim[1] - s*np.diff(xlim)
+        # ax.set_xlim(xlim)
+        # ax.scatter([b]*df.shape[1], np.arange(df.shape[1]), s=48, c=label_colors[hierarchy.leaves_list(Zx)], clip_on=False)
+        # ax.tick_params(axis='y', pad=12)
+
+        # s = 1.02
+        # ylim = ax.get_ylim()
+        # b = ylim[1] - s*np.diff(ylim)
+        # ax.set_ylim(ylim)
+        # ax.scatter(np.arange(df.shape[1]), [b]*df.shape[1], s=36, c=label_colors[hierarchy.leaves_list(Zx)], clip_on=False)
+        # ax.tick_params(axis='x', pad=12)
 
     cbar = plt.colorbar(h, cax=cax, orientation=colorbar_orientation)
     cax.locator_params(nbins=4)

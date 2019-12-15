@@ -75,7 +75,7 @@ class Exon(object):
         self.end_pos = end_pos
         self.length = end_pos-start_pos+1
 
-    def __str__(self, ref=1): 
+    def __str__(self, ref=1):
         return 'exon_id: ' + self.id + '; exon_number: {0:2d}'.format(self.number)\
             + '; pos.: {0:d}-{1:d}'.format(self.start_pos-ref+1, self.end_pos-ref+1)\
             + '; length: {0:d}'.format(self.length)
@@ -182,8 +182,9 @@ class Gene(object):
 
     def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight=None,
              fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], reference=None, show_ylabels=True,
-             intron_coords=None, highlight_intron=None, clip_on=False):
+             intron_coords=None, highlight_intron=None, clip_on=False, yoffset=0, xlim=None):
         """Visualization"""
+
         max_intron = int(max_intron)
         if reference is None:
             reference = self.start_pos
@@ -226,7 +227,7 @@ class Gene(object):
         cumul_dist_adj = np.cumsum(cumul_dist_adj)
 
         # plot transcripts; positions are in genomic coordinates
-        for (i,t) in enumerate(self.transcripts[::-1]):
+        for (i,t) in enumerate(self.transcripts[::-1], yoffset):
 
             # UTR mask
             utr = np.zeros(t.end_pos-t.start_pos+1)
@@ -241,7 +242,8 @@ class Gene(object):
             e = t.end_pos - reference - (cumul_dist[idx]-cumul_dist_adj[idx])
             # plot background line
             wx = 0.05
-            patch = patches.Rectangle((s, i-wx/2), e-s, wx, fc=fc, zorder=9, clip_on=clip_on)
+            y = i-wx/2
+            patch = patches.Rectangle((s, y), e-s, wx, fc=fc, zorder=9, clip_on=clip_on)
             ax.add_patch(patch)
 
             # plot highlighted introns
@@ -277,12 +279,15 @@ class Gene(object):
                 ax.add_patch(patch)
 
         ax.set_ylim([-0.6, i+0.6])
-        xlim = ax.get_xlim()
-        if xlim[0]==0 and xlim[1]==1:
-            xlim = np.array([0, cumul_dist_adj[-1]-1]) + self.start_pos - reference
-            if not axes_input:
-                xlim = [xlim[0]-150, xlim[1]+150]
+        if xlim is not None:
             ax.set_xlim(xlim)
+        else:
+            xlim = ax.get_xlim()
+            if xlim[0]==0 and xlim[1]==1:
+                xlim = np.array([0, cumul_dist_adj[-1]-1]) + self.start_pos - reference
+                if not axes_input:
+                    xlim = [xlim[0]-150, xlim[1]+150]
+                ax.set_xlim(xlim)
         if show_ylabels:
             ax.set_yticks(range(len(self.transcripts)))#, ha='right')
             ax.set_yticklabels([t.id for t in self.transcripts[::-1]], fontsize=9)
@@ -322,7 +327,7 @@ class Gene(object):
             ac.set_xticklabels([])
             ac.set_xticks([])
             format_plot(ac, tick_length=4, hide=['top', 'right'])
-        else:
+        elif not axes_input:
             ax.set_title(self.name + ' (' + self.id + ')', fontsize=12)
 
 
