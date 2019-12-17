@@ -27,7 +27,7 @@ def refresh_gcs_token():
     os.environ.putenv('GCS_OAUTH_TOKEN', t)
 
 
-def _samtools_depth_wrapper(args, d=100000):
+def _samtools_depth_wrapper(args, d=100000, user_project=None):
     bam_file, region_str, sample_id, bam_index_dir = args
 
     cmd = 'samtools depth -a -a -d {} -Q 255 -r {} {}'.format(d, region_str, bam_file)
@@ -211,11 +211,17 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
 
     # add gene model
     gax = fig.add_axes([dl/fw, db/fh, aw/fw, da/fh], sharex=axv[0])
-    gax.axis('off')
     gene.plot(ax=gax, max_intron=max_intron, intron_coords=intron_coords, highlight_intron=highlight_intron, fc='k', ec='none', clip_on=True)
-    gax.set_xticks(ax.get_xticks())
+    # gax.set_xticks(ax.get_xticks())
     gax.set_title('')
+    gax.set_ylabel('Isoforms', fontsize=10, rotation=0, ha='right', va='center')
     plt.setp(gax.get_xticklabels(), visible=False)
+    plt.setp(gax.get_yticklabels(), visible=False)
+    for s in ['top', 'right', 'bottom', 'left']:
+        gax.spines[s].set_visible(False)
+    for line in gax.xaxis.get_ticklines() + gax.yaxis.get_ticklines():
+        line.set_markersize(0)
+        line.set_markeredgewidth(0)
     axv.append(gax)
 
     if mappability_bigwig is not None:  # add mappability
