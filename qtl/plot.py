@@ -76,6 +76,8 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             variant_id=None, jitter=0, bvec=None, boxplot=False, xlabel=None,
             ylabel='Normalized expression', title=None, show_counts=True):
 
+    assert p.index.equals(g.index)
+
     if covariates_df is not None:
         # only residualize the phenotype for plotting
         p = stats.residualize(p.copy(), covariates_df.loc[p.index])
@@ -161,7 +163,8 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
 
 
 def plot_interaction(p, g, i, variant_id, annot, covariates_df=None, lowess=None,
-                     xlabel=None, ylabel=None, title=None, alpha=0.8, s=20, fontsize=14):
+                     xlabel=None, ylabel=None, title=None, alpha=0.8, s=20, fontsize=14,
+                     ah=3, aw=3):
     """
     Plot interaction QTL
 
@@ -188,7 +191,7 @@ def plot_interaction(p, g, i, variant_id, annot, covariates_df=None, lowess=None
         2:'{0}/{0}'.format(alt),
     }
 
-    ax = setup_figure(3,3)
+    ax = setup_figure(ah, aw)
     ax.margins(0.02)
 
     custom_cycler = cycler('color', [
@@ -228,7 +231,10 @@ def plot_interaction(p, g, i, variant_id, annot, covariates_df=None, lowess=None
     if xlabel is None:
         xlabel = i.name
     if ylabel is None:
-        ylabel = annot.get_gene(p.name).name
+        try:
+            ylabel = annot.get_gene(p.name).name
+        except:
+            pass
     ax.set_xlabel(xlabel, fontsize=fontsize)
     ax.set_ylabel(ylabel, fontsize=fontsize)
     if title is None:
@@ -312,7 +318,7 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
                method='average', metric='euclidean', optimal_ordering=False, value_labels=False,
                rotation=-45, ha='left', va='top', tri=False,
                dl=1, dr=1, dt=0.2,
-               db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.2, dc=0.15):
+               db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.175, dc=0.15):
 
     if Zx is None:
         Zy = hierarchy.linkage(df,   method=method, metric=metric, optimal_ordering=optimal_ordering)
@@ -323,7 +329,7 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
     fw = dl+aw+dr
     fh = db+ah+dd+ds+dt
 
-    fig = plt.figure(facecolor=(1,1,1), figsize=(fw,fh))
+    fig = plt.figure(figsize=(fw,fh))
     if dendrogram_pos=='top':
         ax = fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh])
         dax = fig.add_axes([dl/fw, (db+ah+ds)/fh, aw/fw, dd/fh])
@@ -369,8 +375,8 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
 
     if dendrogram_pos=='bottom':
         ax.yaxis.tick_right()
-    else:
-        ax.xaxis.tick_top()
+    # else:
+    #     ax.xaxis.tick_top()
 
     if label_colors is not None:
         s = 1.015

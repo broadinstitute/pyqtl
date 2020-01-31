@@ -79,8 +79,9 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
     df['tstat'] = np.sqrt(tstat2)
     df['maf'] = genotype_df.sum(1) / (2*genotype_df.shape[1])
     df['maf'] = np.where(df['maf']<=0.5, df['maf'], 1-df['maf'])
-    df['chr'] = df.index.map(lambda x: x.split('_')[0])
-    df['position'] = df.index.map(lambda x: int(x.split('_')[1]))
+    if isinstance(df.index[0], str) and '_' in df.index[0]:
+        df['chr'] = df.index.map(lambda x: x.split('_')[0])
+        df['position'] = df.index.map(lambda x: int(x.split('_')[1]))
     df.index.name = 'variant_id'
     if isinstance(genotype, pd.Series):
         df = df.iloc[0]
@@ -113,6 +114,11 @@ def calculate_interaction(genotype_s, phenotype_s, interaction_s, covariates_df=
         p0 =  r.transform(p0.values.reshape(1,-1), center=False)
         i0 =  r.transform(i0.values.reshape(1,-1), center=False)
         dof -= covariates_df.shape[1]
+    else:
+        g0 = g0.values.reshape(1,-1)
+        gi0 = gi0.values.reshape(1,-1)
+        p0 = p0.values.reshape(1,-1)
+        i0 = i0.values.reshape(1,-1)
 
     # regression
     X = np.r_[g0, i0, gi0].T
@@ -126,10 +132,10 @@ def calculate_interaction(genotype_s, phenotype_s, interaction_s, covariates_df=
     pval = 2*scipy.stats.t.cdf(-np.abs(tstat), dof)
 
     return pd.Series({
-        'b_g':b[0], 'b_se_g':b_se[0], 'pval_g':pval[0],
-        'b_i':b[1], 'b_se_i':b_se[1], 'pval_i':pval[1],
-        'b_gi':b[2],'b_se_gi':b_se[2],'pval_gi':pval[2],
-    })
+        'b_g':b[0], 'b_g_se':b_se[0], 'pval_g':pval[0],
+        'b_i':b[1], 'b_i_se':b_se[1], 'pval_i':pval[1],
+        'b_gi':b[2],'b_gi_se':b_se[2],'pval_gi':pval[2],
+    }), r[0]
 
 
 def get_conditional_pvalues(group_df, genotypes, phenotype_df, covariates_df, phenotype_id=None, window=200000):

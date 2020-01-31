@@ -102,7 +102,7 @@ def get_genotypes_region(vcf, region, field='GT'):
 
 def impute_mean(df, verbose=True):
     """
-    Impute missing genotypes to mean (in place)
+    Impute missing genotypes (np.NaN) to mean (in place)
 
     Replicates FastQTL data::imputeGenotypes
     """
@@ -136,6 +136,8 @@ def get_genotype(variant_id, vcf, field='GT', convert_gt=True, sample_ids=None):
 
     chrom, pos = variant_id.split('_')[:2]
     s = subprocess.check_output('tabix '+vcf+' '+chrom+':'+pos+'-'+str(int(pos)+1), shell=True)
+    if len(s) == 0:
+        raise ValueError("Variant '{}' not found in VCF.".format(variant_id))
 
     s = s.decode().strip()
     if '\n' in s:
