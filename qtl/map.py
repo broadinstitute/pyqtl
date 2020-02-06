@@ -27,7 +27,6 @@ def center_normalize(x, axis=0):
 def impute_mean(df):
     """Impute missing (NaN) values to mean (in place)"""
     for k,g in enumerate(df.values,1):
-        # ix = g==-1
         ix = np.isnan(g)
         if np.any(ix):
             g[ix] = np.mean(g[~ix])
@@ -85,6 +84,44 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
     df.index.name = 'variant_id'
     if isinstance(genotype, pd.Series):
         df = df.iloc[0]
+    return df
+
+
+def map_pairs(genotype_df, phenotype_df, covariates_df=None, impute=True):
+    """Calculates association statistics for arbitrary phenotype-variant pairs"""
+    assert genotype_df.shape[0] == phenotype_df.shape[0]
+    assert genotype_df.columns.equals(phenotype_df.columns)
+    assert genotype_df.columns.equals(covariates_df.index)
+    if impute:
+        impute_mean(genotype_df)
+
+    # residualize genotypes and phenotype
+    if covariates_df is not None:
+        r = stats.Residualizer(covariates_df)
+        gt_res_df = r.transform(genotype_df)
+        p_res_df = r.transform(phenotype_df)
+        num_covar = covariates_df.shape[1]
+    else:
+        gt_res_df = genotype_df
+        p_res_df = phenotype_df
+        num_covar = 0
+
+    n = p_res_df.std(axis=1).values / gt_res_df.std(axis=1).values
+
+    gt_res_df = center_normalize(gt_res_df, axis=1)
+    p_res_df = center_normalize(p_res_df, axis=1)
+
+    r = np.sum(gt_res_df.values * p_res_df.values, axis=1)
+    dof = gt_res_df.shape[1] - 2 - num_covar
+
+    tstat2 = dof*r*r / (1-r*r)
+    pval = scipy.stats.f.sf(tstat2, 1, dof)
+
+    df = pd.DataFrame({'phenotype_id':phenotype_df.index, 'variant_id':genotype_df.index, 'pval_nominal':pval})
+    df['slope'] = r * n
+    df['slope_se'] = df['slope'].abs() / np.sqrt(tstat2)
+    df['maf'] = genotype_df.sum(1).values / (2*genotype_df.shape[1])
+    df['maf'] = np.where(df['maf']<=0.5, df['maf'], 1-df['maf'])
     return df
 
 
