@@ -91,9 +91,7 @@ def get_genotypes_region(vcf, region, field='GT'):
     field_ix = s[0].split('\t')[8].split(':').index(field)
 
     if field=='GT':
-        gt_map = {'0/0':0, '0/1':1, '1/1':2, './.':np.NaN,
-                  '0|0':0, '0|1':1, '1|0':1, '1|1':2, '.|.':np.NaN}
-        s = [[gt_map[i.split(':', field_ix+1)[field_ix]] for i in si.split('\t')[9:]] for si in s]
+        s = [[gt_dosage_dict[i.split(':', field_ix+1)[field_ix]] for i in si.split('\t')[9:]] for si in s]
     else:
         s = [[i.split(':', field_ix+1)[field_ix] for i in si.split('\t')[9:]] for si in s]
 
@@ -160,9 +158,7 @@ def get_genotype(variant_id, vcf, field='GT', convert_gt=True, sample_ids=None):
         s = [i.split(':', 1)[0] for i in s[9:]]
 
         if convert_gt:
-            gt_map = {'0/0':0, '0/1':1, '1/1':2, './.':np.NaN,
-                      '0|0':0, '0|1':1, '1|0':1, '1|1':2, '.|.':np.NaN}
-            s = np.float32([gt_map[i] for i in s])
+            s = np.float32([gt_dosage_dict[i] for i in s])
 
     if sample_ids is None:
         sample_ids = get_sample_ids(vcf)
@@ -173,9 +169,6 @@ def get_genotype(variant_id, vcf, field='GT', convert_gt=True, sample_ids=None):
 
 def get_genotypes(variant_ids, vcf, field='GT'):
     """"""
-
-    gt_map = {'0/0':0, '0/1':1, '1/1':2, './.':np.NaN,
-              '0|0':0, '0|1':1, '1|0':1, '1|1':2, '.|.':np.NaN}
 
     variant_id_set = set(variant_ids)
 
@@ -191,7 +184,7 @@ def get_genotypes(variant_ids, vcf, field='GT'):
     variant_ids2 = [i[2] for i in s]
     if field=='GT':
         gt_ix = s[0][8].split(':').index('GT')
-        dosages = [[gt_map[j.split(':')[gt_ix]] for j in i[9:]] for i in s]
+        dosages = [[gt_dosage_dict[j.split(':')[gt_ix]] for j in i[9:]] for i in s]
     elif field=='DS':
         ds_ix = s[0][8].split(':').index('DS')
         dosages = np.float32([[j.split(':')[ds_ix] for j in i[9:]] for i in s])
@@ -199,4 +192,38 @@ def get_genotypes(variant_ids, vcf, field='GT'):
     df = df[df.index.isin(variant_id_set)]
     df = df[~df.index.duplicated()]
     return df
+
+
+
+def load_vcf(vcf):
+    """Load dosages as DataFrame"""
+
+    nvariants = int(subprocess.check_output('bcftools index -n {}'.format(vcf), shell=True).decode())
+    sample_ids = subprocess.check_output('bcftools query -l {}'.format(vcf), shell=True).decode().strip().split()
+    nsamples = len(sample_ids)
+    dosages = np.zeros([nvariants, nsamples], dtype=np.float32)
+
+    gt_dosage_dict['./1'] = np.NaN
+    gt_dosage_dict['1/.'] = np.NaN
+
+    with gzip.open(vcf, 'rt') as f:
+        for line in f:
+            if line[:4]=='#CHR':
+                break
+
+        # parse first line
+        line = f.readline().strip().split('\t')
+        assert 'GT' in line[8]
+        gt_ix = line[8].split(':').index('GT')
+        variant_ids = [line[2]]
+        dosages[0,:] = [gt_dosage_dict[i.split(':')[gt_ix]] for i in line[9:]]
+
+        for k,line in enumerate(f, 1):
+            line = line.strip().split('\t')
+            variant_ids.append(line[2])
+            dosages[k,:] = [gt_dosage_dict[i.split(':')[gt_ix]] for i in line[9:]]
+            if np.mod(k,1000)==0:
+                print('\rVariants processed: {}'.format(k), end='')
+
+    return pd.DataFrame(dosages, index=variant_ids, columns=sample_ids)
 

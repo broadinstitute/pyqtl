@@ -12,14 +12,22 @@ from . import stats
 from . import map as qtl_map
 
 
-def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25]):
+def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25], colorbar=False):
     """
     """
-    fw = aw + np.sum(xspace)
-    fh = ah + np.sum(yspace)
+    dl, dr = xspace
+    db, dt = yspace
+    fw = dl + aw + dr
+    fh = db + ah + dt
     fig = plt.figure(facecolor=(1,1,1), figsize=(fw,fh))
-    ax = fig.add_axes([xspace[0]/fw, yspace[0]/fh, aw/fw, ah/fh])
-    return ax
+    ax = fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh])
+    if not colorbar:
+        return ax
+    else:
+        ds = 0.2
+        cw = 0.2
+        cax = fig.add_axes([(dl+aw+ds)/fw, (db+ah/2)/fh, cw/fw, ah/2/fh])
+        return ax, cax
 
 
 def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],

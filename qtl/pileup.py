@@ -56,7 +56,7 @@ def samtools_depth(region_str, bam_s, bam_index_dir, d=100000, num_threads=12):
     return pileups_df
 
 
-def group_pileups(pileups_df, libsize_s, variant_id, vcf, covariates_df=None, id_map=lambda x: '-'.join(x.split('-')[:2])):
+def norm_pileups(pileups_df, libsize_s, covariates_df=None, id_map=lambda x: '-'.join(x.split('-')[:2])):
     """
       pileups_df: output from samtools_depth()
       libsize_s: pd.Series mapping sample_id->library size (total mapped reads)
@@ -69,20 +69,31 @@ def group_pileups(pileups_df, libsize_s, variant_id, vcf, covariates_df=None, id
         residualizer = stats.Residualizer(covariates_df)
         pileups_rpm_df = residualizer.transform(pileups_rpm_df)
 
+    return pileups_rpm_df
+
+
+def group_pileups(pileups_df, libsize_s, variant_id, vcf, covariates_df=None, id_map=lambda x: '-'.join(x.split('-')[:2])):
+    """
+      pileups_df: output from samtools_depth()
+      libsize_s: pd.Series mapping sample_id->library size (total mapped reads)
+    """
+    pileups_rpm_df = norm_pileups(pileups_df, libsize_s, covariates_df=covariates_df, id_map=id_map)
+
     # get genotypes
     g = gt.get_genotype(variant_id, vcf)[pileups_rpm_df.columns]
 
     # average pileups by genotype or category
     cols = np.unique(g[g.notnull()]).astype(int)
-    df = pd.concat([pileups_rpm_df[g[g==i].index].mean(axis=1) for i in cols], axis=1)
-    df.columns = cols
+    df = pd.concat([pileups_rpm_df[g[g==i].index].mean(axis=1).rename(i) for i in cols], axis=1)
     return df
 
 
 def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive',
          title=None, label_pos=None, show_variant_pos=False, max_intron=300, alpha=1, lw=0.5, intron_coords=None, highlight_intron=None,
          ymax=None, rasterized=False, outline=False, labels=None):
-    """"""
+    """
+      pileup_dfs:
+    """
 
     if isinstance(pileup_dfs, pd.DataFrame):
         pileup_dfs = [pileup_dfs]
@@ -133,29 +144,31 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
             '{0}{0}'.format(alt)]
     else:
         pos = None
-        gtlabels = ['Low', 'Medium', 'High']
+        # gtlabels = ['Low', 'Medium', 'High']
+        gtlabels = pileup_dfs[0].columns
 
     s = pileup_dfs[0].sum()
     if isinstance(order, list):
         sorder = order
     elif order=='additive':
-        sorder = np.arange(3)
-        if s[0]<s[2]:
+        sorder = s.index
+        if s[sorder[0]]<s[sorder[-1]]:
             sorder = sorder[::-1]
     elif order=='sorted':
         sorder = np.argsort(s)[::-1]
     elif order=='none':
-        sorder = np.arange(pileup_dfs[0].shape[1])
+        sorder = s.index
 
     if ymax is None:
         ymax = 0
         for k,ax in enumerate(axv):
-            for i in sorder:
+            for j,i in enumerate(sorder):
                 if i in pileup_dfs[k]:
+                    print(i)
                     if outline:
-                        ax.plot(xi, pileup_dfs[k][i], label=gtlabels[i], lw=lw, alpha=alpha, rasterized=rasterized)
+                        ax.plot(xi, pileup_dfs[k][i], label=gtlabels[j], lw=lw, alpha=alpha, rasterized=rasterized)
                     else:
-                        ax.fill_between(xi, pileup_dfs[k][i], label=gtlabels[i], alpha=alpha, rasterized=rasterized)
+                        ax.fill_between(xi, pileup_dfs[k][i], label=gtlabels[j], alpha=alpha, rasterized=rasterized)
             ymax = np.maximum(ymax, ax.get_ylim()[1])
 
 
