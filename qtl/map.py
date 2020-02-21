@@ -68,14 +68,14 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
     r = gt_res_df.dot(p_res_s)
     dof = gt_res_df.shape[1] - 2 - num_covar
 
-    tstat2 = dof*r*r / (1-r*r)
-    pval = scipy.stats.f.sf(tstat2, 1, dof)
+    tstat = r * np.sqrt(dof/(1-r*r))
+    pval = 2*scipy.stats.t.cdf(-np.abs(tstat), dof)
 
-    df = pd.DataFrame(pval, index=tstat2.index, columns=['pval_nominal'])
+    df = pd.DataFrame(pval, index=tstat.index, columns=['pval_nominal'])
     df['slope'] = r * n
-    df['slope_se'] = df['slope'].abs() / np.sqrt(tstat2)
+    df['slope_se'] = df['slope'] / tstat
     df['r2'] = r*r
-    df['tstat'] = np.sqrt(tstat2)
+    df['tstat'] = tstat
     df['maf'] = genotype_df.sum(1) / (2*genotype_df.shape[1])
     df['maf'] = np.where(df['maf']<=0.5, df['maf'], 1-df['maf'])
     if isinstance(df.index[0], str) and '_' in df.index[0]:
