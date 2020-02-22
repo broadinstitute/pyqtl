@@ -170,7 +170,7 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
     return ax
 
 
-def plot_interaction(p, g, i, variant_id, annot, covariates_df=None, lowess=None,
+def plot_interaction(p, g, i, variant_id=None, annot=None, covariates_df=None, lowess=None,
                      xlabel=None, ylabel=None, title=None, alpha=0.8, s=20, fontsize=14,
                      ah=3, aw=3):
     """
@@ -192,7 +192,10 @@ def plot_interaction(p, g, i, variant_id, annot, covariates_df=None, lowess=None
         X = np.c_[len(g)*[1],g,i,g*i]
     b,_,_,_ = np.linalg.lstsq(X, p, rcond=None)
 
-    ref, alt = variant_id.split('_')[2:4]
+    if variant_id is not None:
+        ref, alt = variant_id.split('_')[2:4]
+    else:
+        ref, alt = 'ref', 'alt'
     labels = {
         0:'{0}/{0}'.format(ref),
         1:'{}/{}'.format(ref, alt),
