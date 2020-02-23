@@ -253,13 +253,86 @@ def plot_interaction(p, g, i, variant_id=None, annot=None, covariates_df=None, l
     ax.set_title(title, fontsize=fontsize)
     ax.spines['bottom'].set_position(('outward', 6))
     ax.spines['left'].set_position(('outward', 6))
-    ax.spines['bottom'].set_smart_bounds(True)
-    ax.spines['left'].set_smart_bounds(True)
+    return ax
+
+
+def plot_ld(ld_df, ld_threshold=0.1, s=0.25, alpha=1, yscale=3,
+            cmap=plt.cm.Greys, start_pos=None, end_pos=None, ax=None):
+    """"""
+
+    assert ld_df.index.equals(ld_df.columns)
+    ld_df = ld_df.copy()
+    pos = ld_df.index.map(lambda x: int(x.split('_')[1]))
+
+    # drop duplicates (multi-allelic sites)
+    m = ~pos.duplicated()
+    ld_df = ld_df.loc[m, ld_df.columns[m]]
+
+    variant_df = pd.DataFrame(index=ld_df.index)
+    variant_df['chr'] = variant_df.index.map(lambda x: x.split('_')[0])
+    variant_df['pos'] = pos[m]
+
+    if start_pos is None:
+        start_pos = variant_df['pos'][0]
+    if end_pos is None:
+        end_pos = variant_df['pos'][-1]
+
+    ld_df.rename(index=variant_df['pos'],
+                 columns=variant_df['pos'], inplace=True)
+    ld_df.columns.name = 'col'
+    ld_df.index.name = 'row'
+    ld_df.values[np.triu_indices(ld_df.shape[0])] = np.NaN
+
+    v = ld_df.stack().reset_index()
+    v = v[v[0] >= ld_threshold]
+    X = v[['row', 'col']].copy().values.T
+    X[1,:] -= start_pos
+    x0 = np.array([[start_pos, 0]]).T
+    R = np.array([[1, 1], [-1, 1]])/np.sqrt(2)
+
+    # set up figure
+    if ax is None:
+        pad = 0.1
+        dl = pad
+        aw = 8
+        dr = 0.5
+        db = 0.5
+        ah = aw/yscale  # must also scale ylim below
+        dt = pad
+        fw = dl+aw+dr
+        fh = db+ah+dt
+        ds = 0.1
+        fig = plt.figure(facecolor=(1,1,1), figsize=(fw,fh))
+        ax = fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh])
+        cax = fig.add_axes([(dl+aw+ds)/fw, db/fh, 0.1/fw, 0.8/fh])
+
+    # plot
+    X = np.dot(R, X-x0)/np.sqrt(2) + x0
+    order = np.argsort(v[0])
+    h = ax.scatter(X[0,order], X[1,order], s=s, c=v[0].iloc[order], marker='D', clip_on=False,
+               alpha=alpha, edgecolor='none', cmap=cmap, vmin=0, vmax=1, rasterized=True)
+
+    hc = plt.colorbar(h, cax=cax)
+    hc.set_label('$\mathregular{R^2}$', fontsize=12, rotation=0, ha='left', va='center')
+    hc.locator = ticker.MaxNLocator(min_n_ticks=3, nbins=2)
+
+    xlim = [start_pos, end_pos]
+    ax.set_xlim(xlim)
+    ax.set_ylim([-np.diff(xlim)/yscale, 0])
+
+    for s in ['left', 'top', 'right']:
+        ax.spines[s].set_visible(False)
+    ax.set_yticks([])
+
+    ax.set_xticklabels(ax.get_xticks()/1e6);
+    ax.set_xlabel('Position on {} (Mb)'.format(variant_df['chr'][0]), fontsize=14)
+    return ax
 
 
 def plot_effects(dfs, args, ax=None,
                  xspace=[2.25,2,0.5], yspace=[0.5,3,0.5], xlim=None,
                  xlabel='log$\mathregular{_{2}}$(Fold enrichment)', ylabel=None):
+    """"""
 
     if isinstance(dfs, pd.DataFrame):
         dfs = [dfs]
