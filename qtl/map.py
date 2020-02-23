@@ -176,6 +176,7 @@ def calculate_interaction(genotype_s, phenotype_s, interaction_s, covariates_df=
 
 
 def get_conditional_pvalues(group_df, genotypes, phenotype_df, covariates_df, phenotype_id=None, window=200000):
+    """"""
     assert np.all(phenotype_df.columns==covariates_df.index)
     variant_id = group_df['variant_id'].iloc[0]
     chrom, pos = variant_id.split('_')[:2]
@@ -201,11 +202,7 @@ def get_conditional_pvalues(group_df, genotypes, phenotype_df, covariates_df, ph
 
     for k,(variant_id, phenotype_id) in enumerate(zip(group_df['variant_id'], group_df['phenotype_id']), 1):
         print('\rProcessing {}/{}'.format(k, group_df.shape[0]), end='')
-        covariates = np.hstack([
-            covariates_df,
-            # gi.get_genotypes(np.setdiff1d(group_df['variant_id'], variant_id)).T,
-            gt_df.loc[np.setdiff1d(group_df['variant_id'], variant_id)].T,
-        ])
+        covariates = pd.concat([covariates_df, gt_df.loc[np.setdiff1d(group_df['variant_id'], variant_id)].T], axis=1)
         pval_df = calculate_association(gt_df, phenotype_df.loc[phenotype_id], covariates_df=covariates)
         pval_df['r2'] = gt_df.corrwith(gt_df.loc[variant_id], axis=1, method='pearson')**2
 
