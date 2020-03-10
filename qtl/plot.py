@@ -396,6 +396,54 @@ def plot_effects(dfs, args, ax=None,
     return ax
 
 
+def qqplot(pval, pval_null=None, title='', labels=None):
+    """QQ-plot"""
+
+    if labels is None:
+        labels = ['', '']
+    n = len(pval)
+    x = -np.log10(np.arange(1,n+1)/(n+1))
+
+    ax = qtl.plot.setup_figure(2,2)
+    ax.margins(x=0.02, y=0.05)
+    args = {'s':16, 'edgecolor':'none', 'clip_on':False, 'alpha':1, 'rasterized':True}
+
+    log_pval_sorted = -np.log10(np.sort(pval))
+    ax.scatter(x, log_pval_sorted,
+               c=None, zorder=30, label=labels[0], **args)
+
+    if pval_null is not None:
+        assert len(pval)==len(pval_null)
+        log_pval_sorted = -np.log10(np.sort(pval_null))
+        ax.scatter(x, log_pval_sorted,
+                   c=[[0.5]*3], zorder=20, label=labels[1], **args)
+
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True, min_n_ticks=5, nbins=4))
+    ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True, min_n_ticks=5, nbins=4))
+
+    ax.set_xlabel('Expected -log$\mathregular{_{10}}$(p-value)', fontsize=14)
+    ax.set_ylabel('Observed -log$\mathregular{_{10}}$(p-value)', fontsize=14)
+    qtl.plot.format_plot(ax, fontsize=12)
+
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    ax.set_xlim([0, xlim[1]])
+    ax.set_ylim([0, ylim[1]])
+
+    ci = 0.95
+    xi = np.arange(1, n+1)
+    clower = -np.log10(stats.beta.ppf((1-ci)/2, xi, xi[::-1]))
+    cupper = -np.log10(stats.beta.ppf((1+ci)/2, xi, xi[::-1]))
+    ax.fill_between(x, cupper, clower, color=[[0.8]*3], clip_on=True)
+    ax.plot([x[0], x[-1]], [x[0], x[-1]], '--', lw=1, color=[0.2]*3, zorder=50, clip_on=False)
+
+    ax.spines['left'].set_position(('outward', 6))
+    ax.spines['bottom'].set_position(('outward', 6))
+    ax.set_title('{}'.format(title), fontsize=12)
+    if labels[0] != '':
+        ax.legend(loc='upper left', fontsize=10, handlelength=0.5, handletextpad=0.33)
+
+
 def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.Blues,
                origin='lower', dendrogram_pos='top',
                fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar_orientation='vertical',

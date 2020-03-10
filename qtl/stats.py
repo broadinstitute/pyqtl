@@ -6,6 +6,7 @@ class Residualizer(object):
     def __init__(self, C, fail_colinear=False):
         # center and orthogonalize
         self.Q, R = np.linalg.qr(C - np.mean(C,0))
+        self.dof = C.shape[0] - 2 - C.shape[1]
 
         # check for colinearity
         colinear_ix = np.abs(np.diag(R)) < np.finfo(np.float64).eps * C.shape[1]

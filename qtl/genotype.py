@@ -72,17 +72,16 @@ def get_variant_ids(vcf):
     return s.strip(b'\n').split(b'\n')
 
 
-def get_cis_genotypes(chrom, tss, vcf, field='GT', window=1000000):
+def get_cis_genotypes(chrom, tss, vcf, field='GT', dosages=True, window=1000000):
     """Get genotypes in cis window (using tabix)"""
     region_str = chrom+':'+str(np.maximum(tss-window, 1))+'-'+str(tss+window)
-    return get_genotypes_region(vcf, region_str, field=field)
+    return get_genotypes_region(vcf, region_str, field=field, dosages=dosages)
 
 
-def get_genotypes_region(vcf, region, field='GT'):
+def get_genotypes_region(vcf, region, field='GT', dosages=True):
     """Get genotypes, using region (chr:start-end) string"""
-    print('Getting {} for region {}'.format(field, region))
-    cmd = 'tabix '+vcf+' '+region
-    s = subprocess.check_output(cmd, shell=True, executable='/bin/bash')
+    s = subprocess.check_output('tabix {} {}'.format(vcf, region),
+                                shell=True, executable='/bin/bash')
     s = s.decode().strip()
     if len(s)==0:
         raise ValueError('No variants in region {}'.format(region))
@@ -90,12 +89,14 @@ def get_genotypes_region(vcf, region, field='GT'):
     variant_ids = [si.split('\t', 3)[-2] for si in s]
     field_ix = s[0].split('\t')[8].split(':').index(field)
 
-    if field=='GT':
+    if dosages:
         s = [[gt_dosage_dict[i.split(':', field_ix+1)[field_ix]] for i in si.split('\t')[9:]] for si in s]
+        dtype = np.float32
     else:
         s = [[i.split(':', field_ix+1)[field_ix] for i in si.split('\t')[9:]] for si in s]
+        dtype = str
 
-    return pd.DataFrame(data=s, index=variant_ids, columns=get_sample_ids(vcf), dtype=np.float32)
+    return pd.DataFrame(data=s, index=variant_ids, columns=get_sample_ids(vcf), dtype=dtype)
 
 
 def impute_mean(df, verbose=True):
