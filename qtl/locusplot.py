@@ -200,7 +200,7 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
 
 def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None,
                highlight_ids=None, independent_df=None, shared_only=True,
-               xlim=None, ymax=None, labels=None, title=None, shade_range=None,
+               xlim=None, ymax=None, sharey=None, labels=None, title=None, shade_range=None,
                gene_label_pos='right', chr_label_pos='bottom', window=200000, colorbar=True,
                dl=0.75, aw=4, dr=0.75, db=1, ah=1.25, dt=0.25, ds=0.05, dg=0.2,
                single_ylabel=False):
@@ -230,6 +230,7 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None,
         xlim = np.array([pos-window, pos+window])
     axes[0].set_xlim(xlim)
     axes[0].xaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=3, nbins=4))
+
 
     # LocusZoom colors
     lz_colors = ["#7F7F7F", "#282973", "#8CCCF0", "#69BD45", "#F9A41A", "#ED1F24"]
@@ -341,6 +342,15 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None,
             line.set_markersize(0)
             line.set_markeredgewidth(0)
 
+    if sharey is not None:
+        shared_max = 0
+        for k in sharey:
+            y = axes[k-1].get_ylim()[1]
+            if y > shared_max:
+                shared_max = y
+        for k in sharey:
+            axes[k-1].set_ylim([0, shared_max])
+
     # add gene model
     gene = annot.gene_dict[gene_id]
     if gene.chr == chrom:
@@ -442,8 +452,8 @@ if __name__=='__main__':
     mpl.use('Agg')
 
     parser = argparse.ArgumentParser(description='locus plot')
-    parser.add_argument('--eqtl', required=True, help='eQTL summary statistics file containing all pairwise associations')
-    parser.add_argument('--ieqtl', required=True, help='ieQTL summary statistics file containing all pairwise associations')
+    parser.add_argument('--eqtl', required=True, help='QTL summary statistics file containing all pairwise associations')
+    parser.add_argument('--ieqtl', required=True, help='iQTL summary statistics file containing all pairwise associations')
     parser.add_argument('--gwas', required=True, help='GWAS summary statistics file')
     parser.add_argument('--vcf', required=True, help='VCF file')
     parser.add_argument('--phenotype_bed', required=True, help='Phenotype BED file used for QTL mapping (required for parsing sample IDs)')
@@ -455,6 +465,8 @@ if __name__=='__main__':
     parser.add_argument('--id_lookup_table', help='Lookup table mapping variant IDs to rs IDs (rs ID must be in last column)')
     parser.add_argument('--window', default=200000, type=int, help='')
     parser.add_argument('--labels', nargs='+', default=None)
+    parser.add_argument('--ymax', nargs='+', type=np.float64, default=None)
+    parser.add_argument('--sharey', nargs='+', type=int, help='Use same y-axis for the specified plots (1-indexed, with top plot starting at 1.)', default=None)
     parser.add_argument('--top_variant', default='ieQTL', choices=['GWAS', 'eQTL', 'ieQTL'])
     parser.add_argument('--output_dir', default='.', type=str, help='')
     args = parser.parse_args()
@@ -504,6 +516,7 @@ if __name__=='__main__':
     print('Generating plot')
     plot_locus([gwas_df, eqtl_df, ieqtl_df], args.gene_id, variant_id, annot, r2_s=r2_s,
                rs_id=rs_id, labels=[i.encode('utf-8').decode('unicode_escape') for i in args.labels],
+               ymax=args.ymax, sharey=args.sharey,
                window=args.window, shared_only=True)
 
     pdf_file = os.path.join(args.output_dir, '{}.{}.locus_plot.pdf'.format(gene.name, variant_id))
