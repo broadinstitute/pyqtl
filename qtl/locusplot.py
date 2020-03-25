@@ -198,7 +198,7 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
     return ax
 
 
-def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None,
+def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None, show_rsid=True,
                highlight_ids=None, independent_df=None, shared_only=True,
                xlim=None, ymax=None, sharey=None, labels=None, title=None, shade_range=None,
                gene_label_pos='right', chr_label_pos='bottom', window=200000, colorbar=True,
@@ -212,7 +212,7 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None,
     if isinstance(variant_ids, str):
         variant_ids = [variant_ids]*n
 
-    chrom, pos, ref, alt, _ = variant_ids[0].split('_')
+    chrom, pos = variant_ids[0].split('_')[:2]
     pos = int(pos)
 
     # set up figure
@@ -294,10 +294,11 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None,
         else:
             t = variant_id
 
-        if (minpos-xlim[0])/(xlim[1]-xlim[0]) < 0.55:
-            txt = ax.annotate(t, (minpos, -np.log10(minp)), xytext=(5,5), textcoords='offset points')
-        else:
-            txt = ax.annotate(t, (minpos, -np.log10(minp)), xytext=(-5,5), ha='right', textcoords='offset points')
+        if show_rsid:
+            if (minpos-xlim[0])/(xlim[1]-xlim[0]) < 0.55:
+                txt = ax.annotate(t, (minpos, -np.log10(minp)), xytext=(5,5), textcoords='offset points')
+            else:
+                txt = ax.annotate(t, (minpos, -np.log10(minp)), xytext=(-5,5), ha='right', textcoords='offset points')
         if -np.log10(minp) < -np.log10(pval_df['pval_nominal'].min())*0.8:
             txt.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
         if highlight_ids is not None:
@@ -407,7 +408,7 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None,
         axes[-1].tick_params(axis='x', pad=2)
         axes[-1].xaxis.labelpad = 8
         axes[-1].set_xlabel('Position on {} (Mb)'.format(chrom), fontsize=14)
-        axes[-1].set_xticklabels(axes[-1].get_xticks()/1e6);
+        axes[-1].set_xticklabels(axes[-1].get_xticks()/1e6)
 
     if chr_label_pos!='bottom':
         axes[0].xaxis.tick_top()

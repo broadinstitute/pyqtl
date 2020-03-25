@@ -83,6 +83,7 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             legend_text=None, normalized=False, loc=None, ax=None, color=[0.5]*3,
             variant_id=None, jitter=0, bvec=None, boxplot=False, xlabel=None,
             ylabel='Normalized expression', title=None, show_counts=True):
+    """"""
 
     assert p.index.equals(g.index)
 
@@ -159,8 +160,8 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             c = sorted(var_s.unique())
             assert len(c)==2
 
-            gcounts1 = g[var_s.loc[g.index]==c[0]].value_counts()
-            gcounts2 = g[var_s.loc[g.index]==c[1]].value_counts()
+            gcounts1 = g[var_s==c[0]].value_counts().reindex(np.arange(3), fill_value=0)
+            gcounts2 = g[var_s==c[1]].value_counts().reindex(np.arange(3), fill_value=0)
             ax.set_xticklabels([
                 '{0}/{0}\n({1},{2})'.format(ref, gcounts1[0], gcounts2[0]),
                 '{0}/{1}\n({2},{3})'.format(ref, alt, gcounts1[1], gcounts2[1]),
