@@ -12,7 +12,8 @@ from . import stats
 from . import map as qtl_map
 
 
-def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25], colorbar=False):
+def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
+                 colorbar=False, ds=0.15, cw=0.15):
     """
     """
     dl, dr = xspace
@@ -24,8 +25,6 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25], colorbar=
     if not colorbar:
         return ax
     else:
-        ds = 0.2
-        cw = 0.2
         cax = fig.add_axes([(dl+aw+ds)/fw, (db+ah/2)/fh, cw/fw, ah/2/fh])
         return ax, cax
 
@@ -33,7 +32,7 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25], colorbar=
 def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
                 hide_spines=True, lw=1, fontsize=8):
 
-    ax.autoscale(False)
+    # ax.autoscale(False)
 
     for i in ['left', 'bottom', 'right', 'top']:
         ax.spines[i].set_linewidth(lw)
@@ -537,3 +536,4 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
     ax.tick_params(length=0)
 
     plt.sca(ax)
+    return ax, cax

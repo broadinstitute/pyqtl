@@ -25,6 +25,8 @@ setup(
         'scipy',
         'matplotlib',
         'seaborn',
+        'pyBigWig',
+        'bx-python',
     ],
     classifiers = [
         "Programming Language :: Python :: 3",

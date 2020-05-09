@@ -90,7 +90,8 @@ def group_pileups(pileups_df, libsize_s, variant_id, vcf, covariates_df=None, id
 
 def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive',
          title=None, label_pos=None, show_variant_pos=False, max_intron=300, alpha=1, lw=0.5, intron_coords=None, highlight_intron=None,
-         ymax=None, rasterized=False, outline=False, labels=None):
+         ymax=None, rasterized=False, outline=False, labels=None,
+         dl=0.75, aw=4.5, dr=0.5, db=0.5, ah=1.5, dt=0.25, ds=0.4):
     """
       pileup_dfs:
     """
@@ -99,16 +100,9 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         pileup_dfs = [pileup_dfs]
     num_pileups = len(pileup_dfs)
 
-    dl = 0.75
-    aw = 4.5
-    ah = 1.5
-    dr = 0.5
-    ds = 0.4
     nt = len(gene.transcripts)
     da = 0.08 * nt + 0.01*(nt-1)
     da2 = 0.12
-    db = 0.5
-    dt = 0.25
 
     fw = dl + aw + dr
     fh = db + da + ds + (num_pileups-1)*da2 + num_pileups*ah + dt
@@ -145,7 +139,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     else:
         pos = None
         # gtlabels = ['Low', 'Medium', 'High']
-        gtlabels = pileup_dfs[0].columns
+        # gtlabels = pileup_dfs[0].columns
 
     s = pileup_dfs[0].sum()
     if isinstance(order, list):
@@ -162,13 +156,13 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     if ymax is None:
         ymax = 0
         for k,ax in enumerate(axv):
-            for j,i in enumerate(sorder):
+            for i in sorder:
+            # for j,i in enumerate(sorder):
                 if i in pileup_dfs[k]:
-                    print(i)
                     if outline:
-                        ax.plot(xi, pileup_dfs[k][i], label=gtlabels[j], lw=lw, alpha=alpha, rasterized=rasterized)
+                        ax.plot(xi, pileup_dfs[k][i], label=i, lw=lw, alpha=alpha, rasterized=rasterized)
                     else:
-                        ax.fill_between(xi, pileup_dfs[k][i], label=gtlabels[j], alpha=alpha, rasterized=rasterized)
+                        ax.fill_between(xi, pileup_dfs[k][i], label=i, alpha=alpha, rasterized=rasterized)
             ymax = np.maximum(ymax, ax.get_ylim()[1])
 
 
@@ -196,7 +190,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     else:
         loc = 1
 
-    leg = axv[-1].legend(labelspacing=0.15, frameon=False, fontsize=9, borderaxespad=0.5, borderpad=0, loc=loc)
+    leg = axv[-1].legend(labelspacing=0.15, frameon=False, fontsize=9, borderaxespad=0.5,
+                         borderpad=0, loc=loc, handlelength=0.75)
     for line in leg.get_lines():
         line.set_linewidth(1)
 
