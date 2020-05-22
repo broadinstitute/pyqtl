@@ -22,11 +22,6 @@ def cd(cd_path):
     os.chdir(saved_path)
 
 
-def refresh_gcs_token():
-    t = subprocess.check_output('gcloud auth application-default print-access-token', shell=True)
-    os.environ.putenv('GCS_OAUTH_TOKEN', t)
-
-
 def _samtools_depth_wrapper(args, d=100000, user_project=None):
     bam_file, region_str, sample_id, bam_index_dir = args
 
@@ -183,6 +178,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         ax.tick_params(axis='x', length=3, width=0.6, pad=1)
         ax.set_xticks(xinterp)
         ax.set_xticklabels([])
+        ax.spines['left'].set_position(('outward', 6))
     axv[0].set_xlabel('Exon coordinates on {}'.format(gene.chr), fontsize=12)
 
     if gene.strand=='+':
