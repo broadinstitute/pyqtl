@@ -171,7 +171,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     if labels is None:
         labels = ['Mean RPM']*num_pileups
     for k,ax in enumerate(axv):
-        ax.margins(0.02)
+        ax.margins(0)
         ax.set_ylim([0, ax.get_ylim()[1]])
         ax.set_ylabel(labels[k], fontsize=12)
         qtl_plot.format_plot(ax, fontsize=10, lw=0.6)
@@ -181,13 +181,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         ax.spines['left'].set_position(('outward', 6))
     axv[0].set_xlabel('Exon coordinates on {}'.format(gene.chr), fontsize=12)
 
-    if gene.strand=='+':
-        loc = 2
-    else:
-        loc = 1
-
-    leg = axv[-1].legend(labelspacing=0.15, frameon=False, fontsize=9, borderaxespad=0.5,
-                         borderpad=0, loc=loc, handlelength=0.75)
+    leg = axv[-1].legend(loc='lower left', labelspacing=0.15, frameon=False, fontsize=9, borderaxespad=0.5,
+                         borderpad=0, handlelength=0.75, bbox_to_anchor=(0,1.05), ncol=3)
     for line in leg.get_lines():
         line.set_linewidth(1)
 

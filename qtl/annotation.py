@@ -331,6 +331,17 @@ class Gene(object):
             ax.set_title(self.name + ' (' + self.id + ')', fontsize=12)
 
 
+def get_attributes(attr_str):
+    attributes = defaultdict()
+    for a in attr_str.replace('"', '').split(';')[:-1]:
+        kv = a.strip().split(' ')
+        if kv[0] != 'tag':
+            attributes[kv[0]] = kv[1]
+        else:
+            attributes.setdefault('tags', []).append(kv[1])
+    return attributes
+
+
 class Annotation(object):
 
     def __init__(self, varin, verbose=True):
@@ -370,13 +381,7 @@ class Annotation(object):
                     strand = row[6]
                     # phase = row[7]
 
-                    attributes = defaultdict()
-                    for a in row[8].replace('"', '').split(';')[:-1]:
-                        kv = a.strip().split(' ')
-                        if kv[0]!='tag':
-                            attributes[kv[0]] = kv[1]
-                        else:
-                            attributes.setdefault('tags', []).append(kv[1])
+                    attributes = get_attributes(row[8])
 
                     if annot_type=='gene':
                         gene_id = attributes['gene_id']
@@ -393,6 +398,10 @@ class Annotation(object):
 
                     elif annot_type=='transcript':
                         transcript_id = attributes['transcript_id']
+                        if 'transcript_name' not in attributes:
+                            attributes['transcript_name'] = attributes['transcript_id']
+                        if 'transcript_type' not in attributes:
+                            attributes['transcript_type'] = 'unknown'
                         t = Transcript(attributes.pop('transcript_id'), attributes.pop('transcript_name'), attributes.pop('transcript_type'), g, start_pos, end_pos)
                         t.attributes = attributes
                         g.transcripts.append(t)

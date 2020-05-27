@@ -32,8 +32,7 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
 def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
                 hide_spines=True, lw=1, fontsize=8):
 
-    # ax.autoscale(False)
-
+    ax.autoscale(False)
     for i in ['left', 'bottom', 'right', 'top']:
         ax.spines[i].set_linewidth(lw)
 
@@ -74,8 +73,7 @@ def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
         line.set_markersize(tick_length/2)
         line.set_markeredgewidth(lw/2)
 
-    xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
+    ax.autoscale(True)  # temporary fix?
 
 
 def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=None, covariates_df=None,
