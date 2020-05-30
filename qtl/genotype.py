@@ -99,27 +99,22 @@ def get_genotypes_region(vcf, region, field='GT', dosages=True):
     return pd.DataFrame(data=s, index=variant_ids, columns=get_sample_ids(vcf), dtype=dtype)
 
 
-def impute_mean(df, verbose=True):
-    """
-    Impute missing genotypes (np.NaN) to mean (in place)
+def impute_mean(df, missing=lambda x: np.isnan(x), verbose=True):
+    """Row-wise mean imputation (in place)"""
+    if isinstance(df, pd.DataFrame):
+        genotypes = df.values
+    else:
+        genotypes = df
 
-    Replicates FastQTL data::imputeGenotypes
-    """
-    if verbose:
-        print('Imputing missing samples to mean')
     n = 0
-    for k,g in enumerate(df.values,1):
-        # ix = g==-1
-        ix = np.isnan(g)
+    for k,g in enumerate(genotypes,1):
+        ix = missing(g)
         if np.any(ix):
             g[ix] = np.mean(g[~ix])
             n += 1
-        if verbose and np.mod(k, 1000)==0:
-            print('\r  * parsed {} sites'.format(k), end='')
-    if verbose:
-        print('\r  * parsed {} sites'.format(k))
-        if n>0:
-            print('  * imputed at least 1 sample in {} sites'.format(n))
+
+    if verbose and n > 0:
+        print('  * imputed at least 1 sample in {} sites'.format(n))
 
 
 def get_genotype(variant_id, vcf, field='GT', convert_gt=True, sample_ids=None):

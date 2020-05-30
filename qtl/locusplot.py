@@ -20,6 +20,7 @@ import gzip
 import re
 
 from . import annotation
+from . import genotype as gt
 
 
 def get_sample_ids(vcf):
@@ -62,24 +63,6 @@ def get_genotypes_region(vcf, region, field='GT'):
     return pd.DataFrame(data=s, index=variant_ids, columns=get_sample_ids(vcf), dtype=np.float32)
 
 
-def impute_mean(df, verbose=True):
-    """Impute missing genotypes to mean (in place)"""
-    if verbose:
-        print('Imputing missing samples to mean')
-    n = 0
-    for k,g in enumerate(df.values,1):
-        # ix = g==-1
-        ix = np.isnan(g)
-        if np.any(ix):
-            g[ix] = np.mean(g[~ix])
-            n += 1
-        if np.mod(k, 1000)==0 and verbose:
-            print('\r  * parsed {} sites'.format(k), end='')
-    if verbose:
-        print('  * parsed {} sites'.format(k))
-        print('  * imputed at least 1 sample in {} sites'.format(n))
-
-
 def load_eqtl(eqtl_file, gene_id, chrom=None):
     """Load full eQTL or ieQTL summary statistics for the specified gene"""
     if eqtl_file.endswith('parquet'):
@@ -115,7 +98,7 @@ def get_ld(vcf, variant_id, phenotype_bed, window=200000):
     chrom, pos, _, _, _ = variant_id.split('_')
     pos = int(pos)
     genotype_df = get_cis_genotypes(chrom, pos, vcf, window=window)[phenotype_df.columns]
-    impute_mean(genotype_df, verbose=False)
+    gt.impute_mean(genotype_df, verbose=False)
     r2_s = compute_ld(genotype_df, variant_id)
     return r2_s
 
@@ -204,6 +187,9 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None, show_r
                gene_label_pos='right', chr_label_pos='bottom', window=200000, colorbar=True,
                dl=0.75, aw=4, dr=0.75, db=1, ah=1.25, dt=0.25, ds=0.05, dg=0.2,
                single_ylabel=False):
+    """
+      pvals: pd.DataFrame, or list of pd.DataFrame. Must contain 'pval_nominal' and 'position' columns.
+    """
 
     if isinstance(pvals, pd.DataFrame):
         pvals = [pvals]

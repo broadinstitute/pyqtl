@@ -24,14 +24,6 @@ def center_normalize(x, axis=0):
         return x0 / np.sqrt(np.sum(x0*x0, axis=axis))
 
 
-def impute_mean(df):
-    """Impute missing (NaN) values to mean (in place)"""
-    for k,g in enumerate(df.values,1):
-        ix = np.isnan(g)
-        if np.any(ix):
-            g[ix] = np.mean(g[~ix])
-
-
 def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True):
     """Compute genotype-phenotype associations"""
     if isinstance(genotype, pd.Series):
@@ -47,7 +39,7 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
 
     # impute missing genotypes
     if impute:
-        impute_mean(genotype_df)
+        gt.impute_mean(genotype_df, verbose=False)
 
     # residualize genotypes and phenotype
     if covariates_df is not None:
