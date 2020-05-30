@@ -181,7 +181,7 @@ class Gene(object):
                 e.end_pos += offset
 
     def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight=None,
-             fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], reference=None, show_ylabels=True,
+             fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], wx=0.05, reference=None, show_ylabels=True,
              intron_coords=None, highlight_intron=None, clip_on=False, yoffset=0, xlim=None):
         """Visualization"""
 
@@ -241,7 +241,6 @@ class Gene(object):
             idx = np.nonzero(t.end_pos - self.start_pos>=cumul_dist)[0][-1]
             e = t.end_pos - reference - (cumul_dist[idx]-cumul_dist_adj[idx])
             # plot background line
-            wx = 0.05
             y = i-wx/2
             patch = patches.Rectangle((s, y), e-s, wx, fc=fc, zorder=9, clip_on=clip_on)
             ax.add_patch(patch)

@@ -13,7 +13,7 @@ from . import map as qtl_map
 
 
 def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
-                 colorbar=False, ds=0.15, cw=0.15):
+                 colorbar=False, ds=0.15, cw=0.15, ch=None):
     """
     """
     dl, dr = xspace
@@ -25,8 +25,18 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
     if not colorbar:
         return ax
     else:
-        cax = fig.add_axes([(dl+aw+ds)/fw, (db+ah/2)/fh, cw/fw, ah/2/fh])
+        if ch is None:
+            ch = ah/2
+        cax = fig.add_axes([(dl+aw+ds)/fw, (db+ah-ch)/fh, cw/fw, ch/fh])
         return ax, cax
+
+
+#     if not box:
+#         ax.spines['left'].set_position(('outward', 6))
+#         ax.spines['bottom'].set_position(('outward', 6))
+#         ax.spines['right'].set_visible(False)
+#         ax.spines['top'].set_visible(False)
+#     ax.tick_params(axis='both', which='both', direction='out', labelsize=fontsize)
 
 
 def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],

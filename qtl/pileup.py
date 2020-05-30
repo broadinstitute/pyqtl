@@ -210,7 +210,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
 
     # add gene model
     gax = fig.add_axes([dl/fw, db/fh, aw/fw, da/fh], sharex=axv[0])
-    gene.plot(ax=gax, max_intron=max_intron, intron_coords=intron_coords, highlight_intron=highlight_intron, fc='k', ec='none', clip_on=True)
+    gene.plot(ax=gax, max_intron=max_intron, intron_coords=intron_coords, wx=0.1,
+              highlight_intron=highlight_intron, fc='k', ec='none', clip_on=True)
     # gax.set_xticks(ax.get_xticks())
     gax.set_title('')
     gax.set_ylabel('Isoforms', fontsize=10, rotation=0, ha='right', va='center')
