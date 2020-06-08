@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import scipy.stats
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.ticker as ticker
@@ -404,52 +405,80 @@ def plot_effects(dfs, args, ax=None,
     return ax
 
 
-def qqplot(pval, pval_null=None, title='', labels=None):
-    """QQ-plot"""
+def _qq_scatter(ax, pval, ntests=None, label=None, c=None, zorder=None,
+                max_values=100000, step=1000, is_sorted=False, args=None):
+    """"""
+    if ntests is None:
+        ntests = len(pval)
+    n = len(pval)
+    if n > max_values:
+        xi = np.array(list(range(1, max_values+1)) + list(range(max_values+step, n+step, step)))
+    else:
+        xi = np.arange(1, n+1)
+    x = -np.log10(xi/(ntests+1))
+
+    if not is_sorted:
+        log_pval_sorted = -np.log10(np.sort(pval))
+    else:
+        log_pval_sorted = -np.log10(pval)
+
+    ax.scatter(x, list(log_pval_sorted[:max_values]) + list(log_pval_sorted[max_values::step]),
+               c=c, zorder=zorder, label=label, **args)
+
+
+def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=100000, step=1000, is_sorted=False,
+           title='', labels=None, fontsize=14, ax=None):
+    """QQ-plot
+
+      ntests: total number of tests if not equal to len(pval),
+              e.g., if only tail of p-value distribution is provided
+    """
 
     if labels is None:
         labels = ['', '']
-    n = len(pval)
-    x = -np.log10(np.arange(1,n+1)/(n+1))
 
-    ax = qtl.plot.setup_figure(2,2)
+    if ax is None:
+        ax = setup_figure(2,2)
     ax.margins(x=0.02, y=0.05)
     args = {'s':16, 'edgecolor':'none', 'clip_on':False, 'alpha':1, 'rasterized':True}
 
-    log_pval_sorted = -np.log10(np.sort(pval))
-    ax.scatter(x, log_pval_sorted,
-               c=None, zorder=30, label=labels[0], **args)
+    # Q-Q plot for pval
+    _qq_scatter(ax, pval, ntests=ntests, label=labels[0], c=None, zorder=30,
+                max_values=max_values, step=step, is_sorted=is_sorted, args=args)
 
+    # Q-Q plot for null
     if pval_null is not None:
-        assert len(pval)==len(pval_null)
-        log_pval_sorted = -np.log10(np.sort(pval_null))
-        ax.scatter(x, log_pval_sorted,
-                   c=[[0.5]*3], zorder=20, label=labels[1], **args)
+        _qq_scatter(ax, pval_null, ntests=ntests_null, label=labels[1], c=[[0.5]*3], zorder=20,
+                    max_values=max_values, step=step, is_sorted=is_sorted, args=args)
 
     ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True, min_n_ticks=5, nbins=4))
     ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True, min_n_ticks=5, nbins=4))
 
-    ax.set_xlabel('Expected -log$\mathregular{_{10}}$(p-value)', fontsize=14)
-    ax.set_ylabel('Observed -log$\mathregular{_{10}}$(p-value)', fontsize=14)
-    qtl.plot.format_plot(ax, fontsize=12)
+    ax.set_xlabel('Expected -log$\mathregular{_{10}}$(p-value)', fontsize=fontsize)
+    ax.set_ylabel('Observed -log$\mathregular{_{10}}$(p-value)', fontsize=fontsize)
+    format_plot(ax, fontsize=12)
 
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
     ax.set_xlim([0, xlim[1]])
     ax.set_ylim([0, ylim[1]])
 
+    # plot confidence interval
     ci = 0.95
-    xi = np.arange(1, n+1)
-    clower = -np.log10(stats.beta.ppf((1-ci)/2, xi, xi[::-1]))
-    cupper = -np.log10(stats.beta.ppf((1+ci)/2, xi, xi[::-1]))
+    xi = np.linspace(1, ntests, 1000)  # use 1000 points for plot
+    x = -np.log10(xi/(ntests+1))
+    clower = -np.log10(scipy.stats.beta.ppf((1-ci)/2, xi, xi[::-1]))
+    cupper = -np.log10(scipy.stats.beta.ppf((1+ci)/2, xi, xi[::-1]))
     ax.fill_between(x, cupper, clower, color=[[0.8]*3], clip_on=True)
-    ax.plot([x[0], x[-1]], [x[0], x[-1]], '--', lw=1, color=[0.2]*3, zorder=50, clip_on=False)
+    b = -np.log10([1/(ntests+1), ntests/(ntests+1)])
+    ax.plot(b, b, '--', lw=1, color=[0.2]*3, zorder=50, clip_on=False)
 
     ax.spines['left'].set_position(('outward', 6))
     ax.spines['bottom'].set_position(('outward', 6))
     ax.set_title('{}'.format(title), fontsize=12)
     if labels[0] != '':
         ax.legend(loc='upper left', fontsize=10, handlelength=0.5, handletextpad=0.33)
+    return ax
 
 
 def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.Blues,
