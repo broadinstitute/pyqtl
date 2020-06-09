@@ -433,9 +433,10 @@ def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=10000
       ntests: total number of tests if not equal to len(pval),
               e.g., if only tail of p-value distribution is provided
     """
-
     if labels is None:
         labels = ['', '']
+    if ntests is None:
+        ntests = len(pval)
 
     if ax is None:
         ax = setup_figure(2,2)
@@ -465,11 +466,11 @@ def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=10000
 
     # plot confidence interval
     ci = 0.95
-    xi = np.linspace(1, ntests, 1000)  # use 1000 points for plot
+    xi = np.linspace(1, ntests, 100000)
     x = -np.log10(xi/(ntests+1))
     clower = -np.log10(scipy.stats.beta.ppf((1-ci)/2, xi, xi[::-1]))
     cupper = -np.log10(scipy.stats.beta.ppf((1+ci)/2, xi, xi[::-1]))
-    ax.fill_between(x, cupper, clower, color=[[0.8]*3], clip_on=True)
+    ax.fill_between(x, cupper, clower, color=[[0.8]*3], clip_on=True, rasterized=True)
     b = -np.log10([1/(ntests+1), ntests/(ntests+1)])
     ax.plot(b, b, '--', lw=1, color=[0.2]*3, zorder=50, clip_on=False)
 
