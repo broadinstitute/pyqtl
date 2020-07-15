@@ -127,12 +127,14 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     if variant_id is not None:
         chrom,pos,ref,alt = variant_id.split('_')[:4]
         pos = int(pos)
-        gtlabels = [
+        gtlabels = np.array([
             '{0}{0}'.format(ref),
             '{0}{1}'.format(ref, alt),
-            '{0}{0}'.format(alt)]
+            '{0}{0}'.format(alt)
+        ])
     else:
         pos = None
+        gtlabels = None
         # gtlabels = ['Low', 'Medium', 'High']
         # gtlabels = pileup_dfs[0].columns
 
@@ -181,8 +183,12 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         ax.spines['left'].set_position(('outward', 6))
     axv[0].set_xlabel('Exon coordinates on {}'.format(gene.chr), fontsize=12)
 
-    leg = axv[-1].legend(loc='lower left', labelspacing=0.15, frameon=False, fontsize=9, borderaxespad=0.5,
-                         borderpad=0, handlelength=0.75, bbox_to_anchor=(0,1.05), ncol=3)
+    if gtlabels is None:
+        leg = axv[-1].legend(loc='lower left', labelspacing=0.15, frameon=False, fontsize=9, borderaxespad=0.5,
+                             borderpad=0, handlelength=0.75, bbox_to_anchor=(0,1.05), ncol=3)
+    else:
+        leg = axv[-1].legend(loc='upper left', labelspacing=0.15, frameon=False, fontsize=9, borderaxespad=0.5,
+                             borderpad=0, handlelength=0.75, labels=gtlabels[sorder])
     for line in leg.get_lines():
         line.set_linewidth(1)
 
