@@ -67,15 +67,21 @@ def norm_pileups(pileups_df, libsize_s, covariates_df=None, id_map=lambda x: '-'
     return pileups_rpm_df
 
 
-def group_pileups(pileups_df, libsize_s, variant_id, vcf, covariates_df=None, id_map=lambda x: '-'.join(x.split('-')[:2])):
+def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=None,
+                  id_map=lambda x: '-'.join(x.split('-')[:2])):
     """
       pileups_df: output from samtools_depth()
       libsize_s: pd.Series mapping sample_id->library size (total mapped reads)
     """
     pileups_rpm_df = norm_pileups(pileups_df, libsize_s, covariates_df=covariates_df, id_map=id_map)
 
-    # get genotypes
-    g = gt.get_genotype(variant_id, vcf)[pileups_rpm_df.columns]
+    # get genotype dosages
+    if isinstance(genotypes, str) and genotypes.endswith('.vcf.gz'):
+        g = gt.get_genotype(variant_id, genotypes)[pileups_rpm_df.columns]
+    elif isinstance(genotypes, pd.Series):
+        g = genotypes
+    else:
+        raise ValueError('Unsupported format for genotypes.')
 
     # average pileups by genotype or category
     cols = np.unique(g[g.notnull()]).astype(int)
