@@ -266,7 +266,7 @@ def plot_interaction(p, g, i, variant_id=None, annot=None, covariates_df=None, l
 
 
 def plot_ld(ld_df, ld_threshold=0.1, s=0.25, alpha=1, yscale=3,
-            cmap=plt.cm.Greys, start_pos=None, end_pos=None, ax=None):
+            cmap=plt.cm.Greys, start_pos=None, end_pos=None, ax=None, cax=None, clip_on=False):
     """"""
 
     assert ld_df.index.equals(ld_df.columns)
@@ -318,22 +318,21 @@ def plot_ld(ld_df, ld_threshold=0.1, s=0.25, alpha=1, yscale=3,
     # plot
     X = np.dot(R, X-x0)/np.sqrt(2) + x0
     order = np.argsort(v[0])
-    h = ax.scatter(X[0,order], X[1,order], s=s, c=v[0].iloc[order], marker='D', clip_on=False,
+    h = ax.scatter(X[0,order]/1e6, X[1,order]/1e6, s=s, c=v[0].iloc[order], marker='D', clip_on=clip_on,
                alpha=alpha, edgecolor='none', cmap=cmap, vmin=0, vmax=1, rasterized=True)
 
-    hc = plt.colorbar(h, cax=cax)
-    hc.set_label('$\mathregular{R^2}$', fontsize=12, rotation=0, ha='left', va='center')
-    hc.locator = ticker.MaxNLocator(min_n_ticks=3, nbins=2)
-
-    xlim = [start_pos, end_pos]
+    if cax is not None:
+        hc = plt.colorbar(h, cax=cax)
+        hc.set_label('$\mathregular{R^2}$', fontsize=12, rotation=0, ha='left', va='center')
+        hc.locator = ticker.MaxNLocator(min_n_ticks=3, nbins=2)
+    xlim = np.array([start_pos, end_pos]) / 1e6
     ax.set_xlim(xlim)
-    ax.set_ylim([-np.diff(xlim)/yscale, 0])
+    ax.set_ylim([-np.diff(xlim)[0]/yscale, 0])
 
     for s in ['left', 'top', 'right']:
         ax.spines[s].set_visible(False)
     ax.set_yticks([])
 
-    ax.set_xticklabels(ax.get_xticks()/1e6);
     ax.set_xlabel('Position on {} (Mb)'.format(variant_df['chr'][0]), fontsize=14)
     return ax
 
