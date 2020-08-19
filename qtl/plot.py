@@ -4,6 +4,7 @@ import scipy.stats
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.ticker as ticker
+import matplotlib.colors as colors
 from matplotlib.colors import hsv_to_rgb
 import seaborn as sns
 import scipy.cluster.hierarchy as hierarchy
@@ -456,7 +457,7 @@ def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=10000
 
     ax.set_xlabel('Expected -log$\mathregular{_{10}}$(p-value)', fontsize=fontsize)
     ax.set_ylabel('Observed -log$\mathregular{_{10}}$(p-value)', fontsize=fontsize)
-    format_plot(ax, fontsize=12)
+    format_plot(ax, fontsize=fontsize-2)
 
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
@@ -483,11 +484,25 @@ def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=10000
 
 def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.Blues,
                origin='lower', dendrogram_pos='top',
+               cohort_s=None, cohort_colors=None, #cohort_labels=None,
                fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar_orientation='vertical',
                method='average', metric='euclidean', optimal_ordering=False, value_labels=False,
                rotation=-45, ha='left', va='top', tri=False,
-               dl=1, dr=1, dt=0.2,
-               db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.175, dc=0.15):
+               dl=1, dr=1, dt=0.2, lh=0.1, ls=0.01,
+               db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.175, dc=0.1):
+
+    if cohort_s is not None:
+        if isinstance(cohort_s, pd.Series):
+            cohort_s = [cohort_s]
+            # cohort_labels = [cohort_labels]
+        n = len(cohort_s)
+        if cohort_colors is None:
+            cohort_colors = []
+            for k in range(n):
+                nc = len(np.unique(cohort_s[k]))
+                cohort_colors.append({i:j for i,j in zip(np.unique(cohort_s[k]), plt.cm.get_cmap('Spectral_r', nc)(np.arange(nc)))})
+    else:
+        n = 0
 
     if Zx is None:
         Zy = hierarchy.linkage(df,   method=method, metric=metric, optimal_ordering=optimal_ordering)
@@ -496,12 +511,16 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
         Zy = Zx
 
     fw = dl+aw+dr
-    fh = db+ah+dd+ds+dt
-
+    fh = db+ah+ds+dd+dt+n*(lh+ls)
     fig = plt.figure(figsize=(fw,fh))
     if dendrogram_pos=='top':
         ax = fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh])
-        dax = fig.add_axes([dl/fw, (db+ah+ds)/fh, aw/fw, dd/fh])
+        lax = []
+        for k in range(n):
+            lax.append(
+                fig.add_axes([dl/fw, (db+ah+(k+1)*ls+k*lh)/fh, aw/fw, lh/fh], sharex=ax)
+            )
+        dax = fig.add_axes([dl/fw,         (db+ah+n*(ls+lh)+ds)/fh, aw/fw, dd/fh])
         cax = fig.add_axes([(dl+aw+dc)/fw, (db+ah-ch)/fh, cw/fw, ch/fh])
     else:
         dax = fig.add_axes([dl/fw, db/fh, aw/fw, dd/fh])
@@ -542,12 +561,24 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
     ax.set_xticklabels(ix, rotation=rotation, fontsize=fontsize, ha=ha, va=va)
     ax.set_yticklabels(iy, fontsize=fontsize)
 
+    # plot cohort labels
+    for k in range(n):
+        cohort_index_s = cohort_s[k].map({j:i for i,j in enumerate(cohort_s[k].unique())})
+        cmap2 = colors.ListedColormap([cohort_colors[k][j] for j in cohort_s[k].unique()], 'indexed')
+        lax[k].imshow(cohort_index_s[ix].values.reshape(1,-1), aspect='auto', origin='lower', cmap=cmap2)
+        # if cluster_labels is not None:
+        lax[k].set_ylabel(cohort_s[k].name, fontsize=10, rotation=0, va='center', ha='right')
+        for i in lax[k].spines:
+            lax[k].spines[i].set_visible(False)
+        lax[k].set_xticks([])
+        lax[k].set_yticks([])
+
     if dendrogram_pos=='bottom':
         ax.yaxis.tick_right()
     # else:
     #     ax.xaxis.tick_top()
 
-    if label_colors is not None:
+    if label_colors is not None:  # plot label dots at bottom
         s = 1.015
         # xlim = ax.get_xlim()
         # b = xlim[1] - s*np.diff(xlim)
