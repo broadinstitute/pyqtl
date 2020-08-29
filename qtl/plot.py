@@ -9,6 +9,7 @@ from matplotlib.colors import hsv_to_rgb
 import seaborn as sns
 import scipy.cluster.hierarchy as hierarchy
 from cycler import cycler
+import copy
 
 from . import stats
 from . import map as qtl_map
@@ -604,4 +605,49 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
     ax.tick_params(length=0)
 
     plt.sca(ax)
+    return ax, cax
+
+
+def hexdensity(x, y, bounds=[1e-2, 1e5], bins='log', scale='log',
+               cmap=None, vmax=None, ax=None, cax=None,
+               unit='TPM', entity='genes',
+               gridsize=175, fontsize=12, show_corr=True, rasterized=False):
+    """Wrapper for hexbin"""
+
+    if ax is None: # setup new axes
+        ax, cax = setup_figure(2,2, colorbar=True, ch=1)
+        ax.margins(0.01)
+
+    if cmap is None:
+        cmap = copy.copy(plt.cm.RdYlBu_r)
+        cmap.set_bad('w', 1.)
+
+    rho = scipy.stats.spearmanr(x, y)[0]
+    x = x.copy()
+    y = y.copy()
+    nanidx = (x == 0) | (y == 0)
+    x[nanidx] = np.NaN
+    y[nanidx] = np.NaN
+
+    h = ax.hexbin(x, y, bins=bins, xscale=scale, yscale=scale, linewidths=0.1,
+                  gridsize=gridsize, cmap=cmap, mincnt=1, zorder=1,
+                  clip_on=False, rasterized=rasterized)
+
+    ax.set_xlim(bounds)
+    ax.set_ylim(bounds)
+    format_plot(ax, fontsize=fontsize-2)
+    ax.spines['left'].set_position(('outward', 6))
+    ax.spines['bottom'].set_position(('outward', 6))
+
+    if show_corr:
+        t = ax.text(1, 0, r'$\rho$ = {:.2f}'.format(rho), transform=ax.transAxes,
+                    ha='right', va='bottom', fontsize=fontsize, zorder=2)
+        t.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
+
+    hc = plt.colorbar(h, cax=cax, orientation='vertical', ticks=ticker.LogLocator(numticks=4))
+    hc.set_label('log$\mathregular{_{10}}$('+entity+')', fontsize=fontsize)
+
+    ax.set_xlabel('{} ({})'.format(x.name, unit), fontsize=fontsize)
+    ax.set_ylabel('{} ({})'.format(y.name, unit), fontsize=fontsize)
+
     return ax, cax
