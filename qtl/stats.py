@@ -51,3 +51,29 @@ class Residualizer(object):
 def residualize(df, C, center=False, fail_colinear=False):
     r = Residualizer(C, fail_colinear=fail_colinear)
     return r.transform(df, center=center)
+
+
+def center_normalize(x, axis=0):
+    """Center and normalize x"""
+    if isinstance(x, pd.DataFrame):
+        x0 = x - np.mean(x.values, axis=axis, keepdims=True)
+        return x0 / np.sqrt(np.sum(x0.pow(2).values, axis=axis, keepdims=True))
+    elif isinstance(x, pd.Series):
+        x0 = x - x.mean()
+        return x0 / np.sqrt(np.sum(x0*x0))
+    elif isinstance(x, np.ndarray):
+        x0 = x - np.mean(x, axis=axis, keepdims=True)
+        return x0 / np.sqrt(np.sum(x0*x0, axis=axis))
+
+
+def padjust_bh(p):
+    """
+    Benjamini-Hochberg adjusted p-values
+
+    Replicates p.adjust(p, method="BH") from R
+    """
+    n = len(p)
+    i = np.arange(n,0,-1)
+    o = np.argsort(p)[::-1]
+    ro = np.argsort(o)
+    return np.minimum(1, np.minimum.accumulate(np.float(n)/i * np.array(p)[o]))[ro]
