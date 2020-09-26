@@ -86,7 +86,7 @@ def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
         line.set_markersize(tick_length/2)
         line.set_markeredgewidth(lw/2)
 
-    ax.autoscale(True)  # temporary fix?
+    # ax.autoscale(True)  # temporary fix?
 
 
 def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=None, covariates_df=None,
@@ -608,14 +608,14 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
     return ax, cax
 
 
-def hexdensity(x, y, bounds=[1e-2, 1e5], bins='log', scale='log',
-               cmap=None, vmax=None, ax=None, cax=None,
+def hexdensity(x, y, bounds=None, bins='log', scale='log',
+               cmap=None, vmin=None, vmax=None, ax=None, cax=None,
                unit='TPM', entity='genes',
                gridsize=175, fontsize=12, show_corr=True, rasterized=False):
     """Wrapper for hexbin"""
 
     if ax is None: # setup new axes
-        ax, cax = setup_figure(2,2, colorbar=True, ch=1)
+        ax, cax = setup_figure(2, 2, xspace=[0.75, 1], yspace=[0.75, 0.5], colorbar=True, ch=1, cw=0.12)
         ax.margins(0.01)
 
     if cmap is None:
@@ -630,12 +630,17 @@ def hexdensity(x, y, bounds=[1e-2, 1e5], bins='log', scale='log',
     y[nanidx] = np.NaN
 
     h = ax.hexbin(x, y, bins=bins, xscale=scale, yscale=scale, linewidths=0.1,
-                  gridsize=gridsize, cmap=cmap, mincnt=1, zorder=1,
+                  gridsize=gridsize, cmap=cmap, vmin=vmin, vmax=vmax, mincnt=1, zorder=1,
                   clip_on=False, rasterized=rasterized)
 
+    ax.set_xticks(ax.get_yticks())
+    format_plot(ax, fontsize=fontsize-2)
+    if bounds is None:
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        bounds = [np.minimum(xlim[0], ylim[0]), np.maximum(xlim[1], ylim[1])]
     ax.set_xlim(bounds)
     ax.set_ylim(bounds)
-    format_plot(ax, fontsize=fontsize-2)
     ax.spines['left'].set_position(('outward', 6))
     ax.spines['bottom'].set_position(('outward', 6))
 
