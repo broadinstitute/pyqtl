@@ -639,8 +639,12 @@ def hexdensity(x, y, bounds=None, bins='log', scale='log',
         xlim = ax.get_xlim()
         ylim = ax.get_ylim()
         bounds = [np.minimum(xlim[0], ylim[0]), np.maximum(xlim[1], ylim[1])]
-    ax.set_xlim(bounds)
-    ax.set_ylim(bounds)
+    elif len(bounds) == 2:
+        ax.set_xlim(bounds)
+        ax.set_ylim(bounds)
+    else:
+        ax.set_xlim(bounds[:2])
+        ax.set_ylim(bounds[2:])
     ax.spines['left'].set_position(('outward', 6))
     ax.spines['bottom'].set_position(('outward', 6))
 
@@ -652,7 +656,9 @@ def hexdensity(x, y, bounds=None, bins='log', scale='log',
     hc = plt.colorbar(h, cax=cax, orientation='vertical', ticks=ticker.LogLocator(numticks=4))
     hc.set_label('log$\mathregular{_{10}}$('+entity+')', fontsize=fontsize)
 
-    ax.set_xlabel('{} ({})'.format(x.name, unit), fontsize=fontsize)
-    ax.set_ylabel('{} ({})'.format(y.name, unit), fontsize=fontsize)
+    if isinstance(x, pd.Series):
+        ax.set_xlabel('{} ({})'.format(x.name, unit), fontsize=fontsize)
+    if isinstance(y, pd.Series):
+        ax.set_ylabel('{} ({})'.format(y.name, unit), fontsize=fontsize)
 
     return ax, cax
