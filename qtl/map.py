@@ -68,8 +68,17 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
     df['slope_se'] = df['slope'] / tstat
     df['r2'] = r*r
     df['tstat'] = tstat
-    df['maf'] = genotype_df.sum(1) / (2*genotype_df.shape[1])
-    df['maf'] = np.where(df['maf']<=0.5, df['maf'], 1-df['maf'])
+    n2 = 2*genotype_df.shape[1]
+    af = genotype_df.sum(1) / n2
+    ix = af <= 0.5
+    df['maf'] = np.where(ix, af, 1-af)
+    m = genotype_df > 0.5
+    a = m.sum(1).astype(int)
+    b = (genotype_df < 1.5).sum(1).astype(int)
+    df['ma_samples'] = np.where(ix, a, b)
+    a = (genotype_df * m).sum(1).round().astype(int)  # round for missing/imputed genotypes
+    df['ma_count'] = np.where(ix, a, n2-a)
+
     if isinstance(df.index[0], str) and '_' in df.index[0]:
         df['chr'] = df.index.map(lambda x: x.split('_')[0])
         df['position'] = df.index.map(lambda x: int(x.split('_')[1]))
@@ -167,6 +176,14 @@ def calculate_interaction(genotype_s, phenotype_s, interaction_s, covariates_df=
     }), r[0]
 
 
+def compute_ld(genotype_df, variant_id):
+    """Compute LD (r2)"""
+    # return gt_df.corrwith(gt_df.loc[variant_id], axis=1, method='pearson')**2
+    g0 = genotype_df - genotype_df.values.mean(1, keepdims=True)
+    d = (g0**2).sum(1) * (g0.loc[variant_id]**2).sum()
+    return (g0 * g0.loc[variant_id]).sum(1)**2 / d
+
+
 def get_conditional_pvalues(group_df, genotypes, phenotype_df, covariates_df, phenotype_id=None, window=200000):
     """"""
     assert np.all(phenotype_df.columns==covariates_df.index)
@@ -189,14 +206,14 @@ def get_conditional_pvalues(group_df, genotypes, phenotype_df, covariates_df, ph
     res = []
     if phenotype_id is not None:
         pval_df = calculate_association(gt_df, phenotype_df.loc[phenotype_id], covariates_df=covariates_df)
-        pval_df['r2'] = gt_df.corrwith(gt_df.loc[variant_id], axis=1, method='pearson')**2
+        pval_df['r2'] = compute_ld(gt_df, variant_id)
         res.append(pval_df)
 
     for k,(variant_id, phenotype_id) in enumerate(zip(group_df['variant_id'], group_df['phenotype_id']), 1):
         print('\rProcessing {}/{}'.format(k, group_df.shape[0]), end='')
         covariates = pd.concat([covariates_df, gt_df.loc[np.setdiff1d(group_df['variant_id'], variant_id)].T], axis=1)
         pval_df = calculate_association(gt_df, phenotype_df.loc[phenotype_id], covariates_df=covariates)
-        pval_df['r2'] = gt_df.corrwith(gt_df.loc[variant_id], axis=1, method='pearson')**2
+        pval_df['r2'] = compute_ld(gt_df, variant_id)
 
         res.append(pval_df)
     return res
