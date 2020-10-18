@@ -77,3 +77,43 @@ def padjust_bh(p):
     o = np.argsort(p)[::-1]
     ro = np.argsort(o)
     return np.minimum(1, np.minimum.accumulate(np.float(n)/i * np.array(p)[o]))[ro]
+
+
+def pi0est(p, lambda_qvalue):
+    """
+    pi0 statistic (Storey and Tibshirani, 2003)
+
+    For fixed values of 'lambda'; equivalent to the qvalue::pi0est
+    from R package qvalue
+    """
+    if np.min(p) < 0 or np.max(p) > 1:
+        raise ValueError("p-values not in valid range [0, 1]")
+    elif np.min(lambda_qvalue) < 0 or np.max(lambda_qvalue) >= 1:
+        raise ValueError("lambda must be within [0, 1)")
+
+    pi0 = np.mean(p >= lambda_qvalue) / (1 - lambda_qvalue)
+    pi0 = np.minimum(pi0, 1)
+
+    if pi0<=0:
+        raise ValueError("The estimated pi0 <= 0. Check that you have valid p-values or use a different range of lambda.")
+
+    return pi0
+
+
+def bootstrap_pi1(pval, lambda_qvalue=0.5, bounds=[2.5, 97.5], n=1000):
+    """Compute confidence intervals for pi1 with bootstrapping"""
+    pi1_boot = []
+    nfail = 0
+    for _ in range(n):
+        try:
+            pi1_boot.append(1 - pi0est(np.random.choice(pval, len(pval), replace=True), lambda_qvalue=lambda_qvalue))
+        except:
+            nfail += 1
+    if nfail > 0:
+        print('Warning: {} bootstraps failed'.format(nfail))
+    pi1_boot = np.array(pi1_boot)
+    if len(pi1_boot) > 0:
+        ci = np.percentile(pi1_boot, bounds)
+    else:
+        ci = np.array([np.NaN, np.NaN])
+    return ci
