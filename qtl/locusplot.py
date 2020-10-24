@@ -89,7 +89,11 @@ def load_gwas(gwas_file, variant_ids):
 
 
 def compute_ld(genotype_df, variant_id):
-    return genotype_df.corrwith(genotype_df.loc[variant_id], axis=1, method='pearson')**2
+    """Compute LD (r2)"""
+    # return genotype_df.corrwith(genotype_df.loc[variant_id], axis=1, method='pearson')**2
+    g0 = genotype_df - genotype_df.values.mean(1, keepdims=True)
+    d = (g0**2).sum(1) * (g0.loc[variant_id]**2).sum()
+    return (g0 * g0.loc[variant_id]).sum(1)**2 / d
 
 
 def get_ld(vcf, variant_id, phenotype_bed, window=200000):
@@ -181,21 +185,28 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
     return ax
 
 
-def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None, show_rsid=True,
-               highlight_ids=None, independent_df=None, shared_only=True,
+def plot_locus(pvals, gene_id=None, variant_ids=None, annot=None, r2_s=None, rs_id=None, show_rsid=True,
+               highlight_ids=None, credible_sets=None,
+               tracks=None, track_colors=None,
+               shared_only=True,
                xlim=None, ymax=None, sharey=None, labels=None, title=None, shade_range=None,
                gene_label_pos='right', chr_label_pos='bottom', window=200000, colorbar=True,
-               dl=0.75, aw=4, dr=0.75, db=1, ah=1.25, dt=0.25, ds=0.05, dg=0.2,
+               dl=0.75, aw=4, dr=0.75, db=0.5, ah=1.25, dt=0.25, ds=0.05, gh=0.2, th=1.5,
                single_ylabel=False):
     """
       pvals: pd.DataFrame, or list of pd.DataFrame. Must contain 'pval_nominal' and 'position' columns.
+      shared_only: only plot variants that are present in all inputs
+      sharey: list of dataset indexes with shared ylim
     """
 
     if isinstance(pvals, pd.DataFrame):
         pvals = [pvals]
     n = len(pvals)
 
-    if isinstance(variant_ids, str):
+    if variant_ids is None:
+        # variant_ids = [pvals[0]['pval_nominal'].idxmin()]*n
+        variant_ids = [p['pval_nominal'].idxmin() for p in pvals]
+    elif isinstance(variant_ids, str):
         variant_ids = [variant_ids]*n
 
     chrom, pos = variant_ids[0].split('_')[:2]
@@ -207,29 +218,37 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None, show_r
         dt = 0.5
     fw = dl + aw + dr
     fh = db + n*ah + (n-1)*ds + dt
-    fig = plt.figure(facecolor=(1,1,1), figsize=(fw,fh))
-    axes = []
-    axes = [fig.add_axes([dl/fw, (db+(n-1)*(ah+ds))/fh, aw/fw, ah/fh])]
-    for i in range(2,n+1):
-        axes.append(fig.add_axes([dl/fw, (db+(n-i)*(ah+ds))/fh, aw/fw, ah/fh], sharex=axes[0]))
+    if gene_id is not None:
+        fh += gh
+    else:
+        gh = 0
+    if tracks is not None:
+        fh += th + ds
+    fig = plt.figure(figsize=(fw,fh))
+    axes = [fig.add_axes([dl/fw, (fh-dt-ah)/fh, aw/fw, ah/fh])]
+    for i in range(1,n):
+        axes.append(fig.add_axes([dl/fw, (fh-dt-ah-i*(ah+ds))/fh, aw/fw, ah/fh], sharex=axes[0]))
+    if tracks is not None:
+        tax = fig.add_axes([dl/fw, (fh-dt-n*(ah+ds)-th)/fh, aw/fw, th/fh], sharex=axes[0])
+    if gene_id is not None:
+        gax = fig.add_axes([dl/fw, (db)/fh, aw/fw, gh/fh], sharex=axes[0])
+
     if xlim is None:
         xlim = np.array([pos-window, pos+window])
     axes[0].set_xlim(xlim)
     axes[0].xaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=3, nbins=4))
 
-
     # LocusZoom colors
     lz_colors = ["#7F7F7F", "#282973", "#8CCCF0", "#69BD45", "#F9A41A", "#ED1F24"]
     select_args = {'s':24, 'marker':'D', 'c':"#714A9D", 'edgecolor':'k', 'lw':0.25}
-    highlight_args = {'s':24, 'marker':'D', 'c':"#ED1F24", 'edgecolor':'k', 'lw':0.25}
-    indep_args = {'s':30, 'marker':'^', 'c':"#E200B2", 'edgecolor':'k', 'lw':0.25}
+    highlight_args = {'s':24, 'marker':'D', 'edgecolor':'k', 'lw':0.25}
     cmap = mpl.colors.ListedColormap(lz_colors)
     bounds = np.append(-1, np.arange(0,1.2,0.2))
     norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
 
     if colorbar:
         s = 0.66
-        cax = fig.add_axes([(dl+aw+0.1)/fw, (db+(n-1)*(ah+ds)+(1-s)/2*ah)/fh, s*ah/5/fw, s*ah/fh])
+        cax = fig.add_axes([(dl+aw+0.1)/fw, (fh-dt-ah+(1-s)/2*ah)/fh, s*ah/5/fw, s*ah/fh])
         cb = mpl.colorbar.ColorbarBase(cax, cmap=cmap,
                                         norm=norm,
                                         boundaries=bounds[1:],  # start at 0
@@ -238,23 +257,13 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None, show_r
                                         orientation='vertical')
         cax.set_title('r$\mathregular{^2}$', fontsize=12)
 
-    if highlight_ids is not None:
-        if isinstance(highlight_ids, str):
-            highlight_ids = [highlight_ids]
-        highlight_pos = [int(i.split('_')[1]) for i in highlight_ids]
-        highlight_pval = pvals[0].loc[highlight_ids, 'pval_nominal']
-
-    if independent_df is not None:
-        ivariant_ids = independent_df.loc[independent_df['gene_id']==gene_id, 'variant_id']
-        ipos = [int(i.split('_')[1]) for i in ivariant_ids]
-
     # common set of variants
     common_ix = pvals[0].index
     for pval_df in pvals[1:]:
         common_ix = common_ix[common_ix.isin(pval_df.index)]
 
     # plot p-values
-    for ax,variant_id,pval_df in zip(axes, variant_ids, pvals):
+    for k,(ax,variant_id,pval_df) in enumerate(zip(axes, variant_ids, pvals)):
         # select variants in window
         m = (pval_df['position']>=xlim[0]) & (pval_df['position']<=xlim[1])
         if shared_only:
@@ -266,10 +275,19 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None, show_r
         # sort variants by LD; plot high LD in front
         if r2_s is not None:
             s = r2_s[window_df.index].sort_values().index
-            ax.scatter(x[s], p[s], c=r2_s[s].replace(np.NaN, -1), s=20, cmap=cmap, norm=norm, edgecolor='k', lw=0.25)
+            r2 = r2_s[s].replace(np.NaN, -1)
         else:
             s = pval_df.loc[window_df.index, 'r2'].sort_values().index
-            ax.scatter(x[s], p[s], c=pval_df.loc[s, 'r2'].replace(np.NaN, -1), s=20, cmap=cmap, norm=norm, edgecolor='k', lw=0.25)
+            r2 = pval_df.loc[s, 'r2'].replace(np.NaN, -1)
+        ax.scatter(x[s], p[s], c=r2, s=20, cmap=cmap, norm=norm, edgecolor='k', lw=0.25)
+
+        if highlight_ids is not None:  # plot relative to lead variant
+            if isinstance(highlight_ids, str):
+                highlight_ids = [highlight_ids]
+            highlight_df = pval_df.loc[highlight_ids].copy()
+            highlight_df = highlight_df[~highlight_df.index.isin(variant_ids)]
+            ix = highlight_df.index
+            ax.scatter(x[ix], p[ix], c=r2[ix], cmap=cmap, norm=norm, **highlight_args)
 
         # plot selected variant, add text label, etc.
         minp = pval_df.loc[variant_id, 'pval_nominal']
@@ -287,10 +305,6 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None, show_r
                 txt = ax.annotate(t, (minpos, -np.log10(minp)), xytext=(-5,5), ha='right', textcoords='offset points')
         if -np.log10(minp) < -np.log10(pval_df['pval_nominal'].min())*0.8:
             txt.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
-        if highlight_ids is not None:
-            ax.scatter(highlight_pos, -np.log10(highlight_pval), **highlight_args)
-        if independent_df is not None:
-            ax.scatter(ipos, -np.log10(pval_df.loc[ivariant_ids, 'pval_nominal']), **indep_args)
 
     for k,ax in enumerate(axes):
         ax.margins(y=0.2)
@@ -323,13 +337,15 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None, show_r
         v = axes
     else:
         v = axes[1:]
+    if tracks is not None:
+        v += [tax]
     for ax in v:
         plt.setp(ax.get_xticklabels(), visible=False)
         for line in ax.xaxis.get_ticklines():
             line.set_markersize(0)
             line.set_markeredgewidth(0)
 
-    if sharey is not None:
+    if sharey is not None:  # force equal y limits
         shared_max = 0
         for k in sharey:
             y = axes[k-1].get_ylim()[1]
@@ -338,31 +354,56 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None, show_r
         for k in sharey:
             axes[k-1].set_ylim([0, shared_max])
 
-    # add gene model
-    gene = annot.gene_dict[gene_id]
-    if gene.chr == chrom:
-        gax = fig.add_axes([dl/fw, (db-0-dg)/fh, aw/fw, dg/fh], sharex=axes[0])
+    if tracks is not None:  # plot, e.g., ATAC-seq tracks
+        ntracks = tracks.shape[1]
+        x = tracks.index
+        maxv = tracks.max().max()
+        for k, label in enumerate(tracks):
+            y0 = (ntracks-1-k) * np.ones(len(x))  # vertical offset
+            if track_colors is not None and label in track_colors:
+                color = track_colors[label]
+            else:
+                color = 'k'
+            c = tracks[label]
+            tax.fill_between(x, 0.95*c/maxv + y0, y0,
+                             antialiased=False, linewidth=1, facecolor=color,
+                             clip_on=True, rasterized=True)
+        tax.set_yticks(np.arange(ntracks))
+        tax.set_yticklabels(tracks.columns[::-1], fontsize=9, va='bottom')
+        for line in tax.yaxis.get_ticklines():
+            line.set_markersize(0)
+            line.set_markeredgewidth(0)
+        for i in ['top', 'bottom', 'right', 'left']:
+            tax.spines[i].set_visible(False)
+        tax.set_ylim([0, ntracks])
 
-        if gene.strand=='+':
-            tss = gene.start_pos
-        else:
-            tss = gene.end_pos
+    if gene_id is None or annot.gene_dict[gene_id].chr != chrom:
+        axes[-1].xaxis.tick_bottom()
+        axes[-1].xaxis.set_label_position('bottom')
+        axes[-1].spines['bottom'].set_visible(True)
+        axes[-1].tick_params(axis='x', pad=2)
+        axes[-1].xaxis.labelpad = 8
+        axes[-1].set_xlabel('Position on {} (Mb)'.format(chrom), fontsize=14)
+        axes[-1].set_xticklabels(axes[-1].get_xticks()/1e6)
+    else:   # add gene model
+        gene = annot.gene_dict[gene_id]
+        #  plot gene model and annotate
         if gene.end_pos < xlim[0]:
-            x = dg/aw/2
-            v = np.array([[x,0.2], [x-0.8*dg/aw, 0.5], [x,0.8]])
+            x = gh/aw/2
+            v = np.array([[x,0.2], [x-0.8*gh/aw, 0.5], [x,0.8]])
             polygon = patches.Polygon(v, True, color='k', transform=gax.transAxes, clip_on=False)
             gax.add_patch(polygon)
-            txt = '{} (~{:.1f}Mb)'.format(gene.name, (pos-tss)/1e6)
+            txt = '{} (~{:.1f}Mb)'.format(gene.name, (pos-gene.tss)/1e6)
             gax.set_ylim([-1,1])
             gax.text(1.5*x, 0.5, txt, va='center', ha='left', transform=gax.transAxes)
         elif gene.start_pos > xlim[1]:
-            x = 1 - dg/aw/2
-            v = np.array([[x,0.2], [x+0.8*dg/aw, 0.5], [x,0.8]])
+            x = 1 - gh/aw/2
+            v = np.array([[x,0.2], [x+0.8*gh/aw, 0.5], [x,0.8]])
             polygon = patches.Polygon(v, True, color='k', transform=gax.transAxes, clip_on=False)
             gax.add_patch(polygon)
-            txt = '{} (~{:.1f}Mb)'.format(gene.name, (tss-pos)/1e6)
+            txt = '{} (~{:.1f}Mb)'.format(gene.name, (gene.tss-pos)/1e6)
             gax.set_ylim([-1,1])
-            gax.text(1 - dg/aw/2*1.5, 0.5, txt, va='center', ha='right', transform=gax.transAxes)
+            gax.text(1 - gh/aw/2*1.5, 0.5, txt, va='center', ha='right', transform=gax.transAxes)
         else:
             gene.plot(ax=gax, max_intron=1e9, fc='k', ec='none', reference=1, scale=0.33, show_ylabels=False, clip_on=True)
             if gene_label_pos=='right':
@@ -387,14 +428,6 @@ def plot_locus(pvals, gene_id, variant_ids, annot, r2_s=None, rs_id=None, show_r
         gax.set_title('')
         gax.set_xticklabels(gax.get_xticks()/1e6);
         axes.append(gax)
-    else:
-        axes[-1].xaxis.tick_bottom()
-        axes[-1].xaxis.set_label_position('bottom')
-        axes[-1].spines['bottom'].set_visible(True)
-        axes[-1].tick_params(axis='x', pad=2)
-        axes[-1].xaxis.labelpad = 8
-        axes[-1].set_xlabel('Position on {} (Mb)'.format(chrom), fontsize=14)
-        axes[-1].set_xticklabels(axes[-1].get_xticks()/1e6)
 
     if chr_label_pos!='bottom':
         axes[0].xaxis.tick_top()
