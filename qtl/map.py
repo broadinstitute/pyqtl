@@ -1,7 +1,7 @@
 """qtl.map: functions for mapping QTLs"""
 
 __author__ = "Francois Aguet"
-__copyright__ = "Copyright 2018-2019, The Broad Institute"
+__copyright__ = "Copyright 2018-2020, The Broad Institute"
 __license__ = "BSD3"
 
 import numpy as np
@@ -9,19 +9,6 @@ import pandas as pd
 import scipy.stats
 from . import stats
 from . import genotype as gt
-
-
-def center_normalize(x, axis=0):
-    """Center and normalize x"""
-    if isinstance(x, pd.DataFrame):
-        x0 = x - np.mean(x.values, axis=axis, keepdims=True)
-        return x0 / np.sqrt(np.sum(x0.pow(2).values, axis=axis, keepdims=True))
-    elif isinstance(x, pd.Series):
-        x0 = x - x.mean()
-        return x0 / np.sqrt(np.sum(x0*x0))
-    elif isinstance(x, np.ndarray):
-        x0 = x - np.mean(x, axis=axis, keepdims=True)
-        return x0 / np.sqrt(np.sum(x0*x0, axis=axis))
 
 
 def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True):
@@ -54,8 +41,8 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
 
     n = p_res_s.std()/gt_res_df.std(axis=1)
 
-    gt_res_df = center_normalize(gt_res_df, axis=1)
-    p_res_s = center_normalize(p_res_s)
+    gt_res_df = stats.center_normalize(gt_res_df, axis=1)
+    p_res_s = stats.center_normalize(p_res_s)
 
     r = gt_res_df.dot(p_res_s)
     dof = gt_res_df.shape[1] - 2 - num_covar
@@ -109,8 +96,8 @@ def map_pairs(genotype_df, phenotype_df, covariates_df=None, impute=True):
 
     n = p_res_df.std(axis=1).values / gt_res_df.std(axis=1).values
 
-    gt_res_df = center_normalize(gt_res_df, axis=1)
-    p_res_df = center_normalize(p_res_df, axis=1)
+    gt_res_df = stats.center_normalize(gt_res_df, axis=1)
+    p_res_df = stats.center_normalize(p_res_df, axis=1)
 
     r = np.sum(gt_res_df.values * p_res_df.values, axis=1)
     dof = gt_res_df.shape[1] - 2 - num_covar

@@ -16,7 +16,7 @@ from . import map as qtl_map
 
 
 def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
-                 colorbar=False, ds=0.15, cw=0.15, ch=None):
+                 colorbar=False, ds=0.15, cw=0.15, ct=0, ch=None):
     """
     """
     dl, dr = xspace
@@ -30,7 +30,7 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
     else:
         if ch is None:
             ch = ah/2
-        cax = fig.add_axes([(dl+aw+ds)/fw, (db+ah-ch)/fh, cw/fw, ch/fh])
+        cax = fig.add_axes([(dl+aw+ds)/fw, (db+ah-ch-ct)/fh, cw/fw, ch/fh])
         return ax, cax
 
 
@@ -43,9 +43,10 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
 
 
 def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
-                hide_spines=True, lw=1, fontsize=8):
+                hide_spines=True, lw=1, fontsize=10,
+                equal_limits=False, offset_x=True, vmin=None):
 
-    ax.autoscale(False)
+    # ax.autoscale(False)
     for i in ['left', 'bottom', 'right', 'top']:
         ax.spines[i].set_linewidth(lw)
 
@@ -85,6 +86,19 @@ def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
     for line in (ax.xaxis.get_ticklines(minor=True) + ax.yaxis.get_ticklines(minor=True)):
         line.set_markersize(tick_length/2)
         line.set_markeredgewidth(lw/2)
+
+    ax.spines['left'].set_position(('outward', 6))
+    if offset_x:
+        ax.spines['bottom'].set_position(('outward', 6))
+
+    if equal_limits:
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        lims = [np.minimum(xlim[0], ylim[0]), np.maximum(xlim[1], ylim[1])]
+        if vmin is not None:
+            lims[0] = vmin
+        ax.set_xlim(lims)
+        ax.set_ylim(lims)
 
     # ax.autoscale(True)  # temporary fix?
 

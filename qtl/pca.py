@@ -23,7 +23,8 @@ def normalize_counts(gct_df, C=None, threshold=10, threshold_frac=0.1):
     gct_norm_df = gct_df.copy() / norm.deseq2_size_factors(gct_df)
     for x in gct_norm_df.values:
         m = x == 0
-        x[m] = np.min(x[~m])/2
+        if not all(m):
+            x[m] = np.min(x[~m])/2
 
     # threshold low expressed genes: >=10 counts in >10% of samples (default)
     mask = np.mean(gct_norm_df >= threshold, axis=1) > threshold_frac
@@ -50,5 +51,5 @@ def get_pcs(gct_df, normalize=True, C=None, n_components=5):
     P = pca.transform(gct_norm_std_df.T)
     pc_df = pd.DataFrame(P, index=gct_norm_std_df.columns,
                         columns=['PC{}'.format(i) for i in range(1, P.shape[1]+1)])
-    pve_s = pd.Series(pca.explained_variance_ratio_ * 100, index=pc_df.columns)
+    pve_s = pd.Series(pca.explained_variance_ratio_ * 100, index=pc_df.columns, name='pve')
     return pc_df, pve_s
