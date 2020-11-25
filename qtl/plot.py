@@ -44,7 +44,7 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
 
 def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
                 hide_spines=True, lw=1, fontsize=10,
-                equal_limits=False, offset_x=True, vmin=None):
+                equal_limits=False, x_offset=0, y_offset=0, vmin=None):
 
     # ax.autoscale(False)
     for i in ['left', 'bottom', 'right', 'top']:
@@ -87,9 +87,8 @@ def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
         line.set_markersize(tick_length/2)
         line.set_markeredgewidth(lw/2)
 
-    ax.spines['left'].set_position(('outward', 6))
-    if offset_x:
-        ax.spines['bottom'].set_position(('outward', 6))
+    ax.spines['left'].set_position(('outward', y_offset))
+    ax.spines['bottom'].set_position(('outward', x_offset))
 
     if equal_limits:
         xlim = ax.get_xlim()
