@@ -12,6 +12,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.patches as patches
+import seaborn as sns
 import argparse
 import subprocess
 import os
@@ -192,7 +193,7 @@ def plot_locus(pvals, gene_id=None, variant_ids=None, annot=None, r2_s=None, rs_
                xlim=None, ymax=None, sharey=None, labels=None, title=None, shade_range=None,
                gene_label_pos='right', chr_label_pos='bottom', window=200000, colorbar=True,
                dl=0.75, aw=4, dr=0.75, db=0.5, ah=1.25, dt=0.25, ds=0.05, gh=0.2, th=1.5,
-               single_ylabel=False):
+               single_ylabel=False, ylabel='-log$\mathregular{_{10}}$(p-value)', rasterized=False):
     """
       pvals: pd.DataFrame, or list of pd.DataFrame. Must contain 'pval_nominal' and 'position' columns.
       shared_only: only plot variants that are present in all inputs
@@ -204,8 +205,14 @@ def plot_locus(pvals, gene_id=None, variant_ids=None, annot=None, r2_s=None, rs_
     n = len(pvals)
 
     if variant_ids is None:
-        # variant_ids = [pvals[0]['pval_nominal'].idxmin()]*n
-        variant_ids = [p['pval_nominal'].idxmin() for p in pvals]
+        variant_ids = []
+        for p in pvals:
+            if 'pval_nominal' in p:
+                variant_ids.append(p['pval_nominal'].idxmin())
+            elif 'pip' in p:
+                variant_ids.append(p['pip'].idxmax())
+            else:
+                variant_ids.append(None)
     elif isinstance(variant_ids, str):
         variant_ids = [variant_ids]*n
 
@@ -263,6 +270,7 @@ def plot_locus(pvals, gene_id=None, variant_ids=None, annot=None, r2_s=None, rs_
         common_ix = common_ix[common_ix.isin(pval_df.index)]
 
     # plot p-values
+    ylabels = []
     for k,(ax,variant_id,pval_df) in enumerate(zip(axes, variant_ids, pvals)):
         # select variants in window
         m = (pval_df['position']>=xlim[0]) & (pval_df['position']<=xlim[1])
@@ -270,40 +278,77 @@ def plot_locus(pvals, gene_id=None, variant_ids=None, annot=None, r2_s=None, rs_
             m &= pval_df.index.isin(common_ix)
         window_df = pval_df.loc[m]
         x = window_df['position']
-        p = -np.log10(window_df['pval_nominal'])
+        if 'pval_nominal' in pval_df:
+            p = -np.log10(window_df['pval_nominal'])
+            ylabels.append(ylabel)
+            minp = -np.log10(pval_df.loc[variant_id, 'pval_nominal'])
 
-        # sort variants by LD; plot high LD in front
-        if r2_s is not None:
-            s = r2_s[window_df.index].sort_values().index
-            r2 = r2_s[s].replace(np.NaN, -1)
-        else:
-            s = pval_df.loc[window_df.index, 'r2'].sort_values().index
-            r2 = pval_df.loc[s, 'r2'].replace(np.NaN, -1)
-        ax.scatter(x[s], p[s], c=r2, s=20, cmap=cmap, norm=norm, edgecolor='k', lw=0.25)
+            # sort variants by LD; plot high LD in front
+            if r2_s is not None:
+                s = r2_s[window_df.index].sort_values().index
+                r2 = r2_s[s].replace(np.NaN, -1)
+            else:
+                s = pval_df.loc[window_df.index, 'r2'].sort_values().index
+                r2 = pval_df.loc[s, 'r2'].replace(np.NaN, -1)
+            ax.scatter(x[s], p[s], c=r2, s=20, cmap=cmap, norm=norm, edgecolor='k', lw=0.25, rasterized=rasterized)
+
+        elif 'pip' in pval_df:
+            p = window_df['pip']
+            ylabels.append('PIP')
+            minp = pval_df['pip'].max()
+            if 'cs_id' in pval_df:
+                pip_df = pval_df[pval_df['cs_id'].notnull()].copy()
+                pip_df['cs_id'] = pip_df['cs_id'].astype(int)
+                cs_colors = sns.color_palette('Set1', desat=0.66).as_hex()
+                cs_cmap = mpl.colors.ListedColormap(cs_colors)
+                cs_norm = mpl.colors.BoundaryNorm(np.arange(1,cmap.N+1), cmap.N)
+                ax.scatter(pip_df['position'], pip_df['pip'], c=pip_df['cs_id'], s=22, ec='none', cmap=cs_cmap, norm=cs_norm, rasterized=rasterized)
+            else:
+                raise NotImplementedError
+
+        if credible_sets is not None:
+            df = pval_df.loc[credible_sets[k]['variant_id']]
+            ax.scatter(df['position'], -np.log10(df['pval_nominal']), c=credible_sets[k]['cs_id']/10, s=50)
+            # credible_sets[k]['variant_id']
 
         if highlight_ids is not None:  # plot relative to lead variant
             if isinstance(highlight_ids, str):
                 highlight_ids = [highlight_ids]
             highlight_df = pval_df.loc[highlight_ids].copy()
-            highlight_df = highlight_df[~highlight_df.index.isin(variant_ids)]
+            highlight_df = highlight_df[~highlight_df.index.isin(variant_ids)]  # drop lead variant
             ix = highlight_df.index
-            ax.scatter(x[ix], p[ix], c=r2[ix], cmap=cmap, norm=norm, **highlight_args)
+            if 'pip' not in pval_df:
+                ax.scatter(x[ix], p[ix], c=r2[ix], cmap=cmap, norm=norm, **highlight_args)
+            else:
+                if 'cs_id' in pval_df:  # only plot highlight IDs that are in CSs
+                    ix = highlight_df.index[highlight_df.index.isin(pip_df.index)]
+                    ax.scatter(x[ix], p[ix], c='goldenrod', **highlight_args)
+                else:
+                    ax.scatter(x[ix], p[ix], c='goldenrod', **highlight_args)
 
         # plot selected variant, add text label, etc.
-        minp = pval_df.loc[variant_id, 'pval_nominal']
         minpos = int(variant_id.split('_')[1])
-        ax.scatter(minpos, -np.log10(minp), **select_args)
+        if 'pip' not in pval_df:
+            ax.scatter(minpos, minp, **select_args)
+        else:
+            # ax.scatter(minpos, minp, **select_args)
+            ax.scatter(minpos, minp, c=pip_df.loc[variant_id, 'cs_id'], cmap=cs_cmap, norm=cs_norm,
+                      s=24, marker='D', ec='k', lw=0.25)
+
         if rs_id is not None:
-            t = rs_id
+            if isinstance(rs_id, str):
+                t = rs_id
+            else:
+                t = rs_id[k]
         else:
             t = variant_id
 
-        if show_rsid:
-            if (minpos-xlim[0])/(xlim[1]-xlim[0]) < 0.55:
-                txt = ax.annotate(t, (minpos, -np.log10(minp)), xytext=(5,5), textcoords='offset points')
+        if show_rsid:  # text label
+            if (minpos-xlim[0])/(xlim[1]-xlim[0]) < 0.55:  # right
+                txt = ax.annotate(t, (minpos, minp), xytext=(5,5), textcoords='offset points')
             else:
-                txt = ax.annotate(t, (minpos, -np.log10(minp)), xytext=(-5,5), ha='right', textcoords='offset points')
-        if -np.log10(minp) < -np.log10(pval_df['pval_nominal'].min())*0.8:
+                txt = ax.annotate(t, (minpos, minp), xytext=(-5,5), ha='right', textcoords='offset points')
+        # if minp < -np.log10(pval_df['pval_nominal'].min())*0.8:
             txt.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
 
     for k,ax in enumerate(axes):
@@ -325,8 +370,8 @@ def plot_locus(pvals, gene_id=None, variant_ids=None, annot=None, r2_s=None, rs_
         m = db + (n*ah + (n-1)*ds)/2
         fig.text(0.035, m/fh, '-log$\mathregular{_{10}}$(p-value)', va='center', rotation=90, fontsize=14);
     else:
-        for ax in axes:
-            ax.set_ylabel('-log$\mathregular{_{10}}$(p-value)', fontsize=12)#, labelpad=15)
+        for k,ax in enumerate(axes):
+            ax.set_ylabel(ylabels[k], fontsize=12)#, labelpad=15)
             ax.yaxis.set_label_coords(-0.07*4/aw, 0.5)
 
     for ax in axes:
