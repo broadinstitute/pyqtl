@@ -22,11 +22,14 @@ def cd(cd_path):
     os.chdir(saved_path)
 
 
-def _samtools_depth_wrapper(args, d=100000, user_project=None):
-    bam_file, region_str, sample_id, bam_index_dir = args
+def _samtools_depth_wrapper(args):
+    bam_file, region_str, sample_id, bam_index_dir, depth = args
 
-    cmd = 'samtools depth -a -a -d {} -Q 255 -r {} {}'.format(d, region_str, bam_file)
-    with cd(bam_index_dir):
+    cmd = f'samtools depth -a -a -d {depth} -Q 255 -r {region_str} {bam_file}'
+    if bam_index_dir is not None:
+        with cd(bam_index_dir):
+            c = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
+    else:
         c = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
 
     df = pd.DataFrame([i.split('\t') for i in c], columns=['chr', 'pos', sample_id])
@@ -34,7 +37,7 @@ def _samtools_depth_wrapper(args, d=100000, user_project=None):
     return df[sample_id].astype(np.int32)
 
 
-def samtools_depth(region_str, bam_s, bam_index_dir, d=100000, num_threads=12):
+def samtools_depth(region_str, bam_s, bam_index_dir=None, d=100000, num_threads=12):
     """
       region_str: string in 'chr:start-end' format
       bam_s: pd.Series or dict mapping sample_id->bam_path
@@ -42,8 +45,8 @@ def samtools_depth(region_str, bam_s, bam_index_dir, d=100000, num_threads=12):
     """
     pileups_df = []
     with mp.Pool(processes=num_threads) as pool:
-        for k,r in enumerate(pool.imap(_samtools_depth_wrapper, [(i,region_str,j,bam_index_dir) for j,i in bam_s.items()]), 1):
-            print('\r  * running samtools depth on region {} for bam {}/{}'.format(region_str, k,len(bam_s)), end='')
+        for k,r in enumerate(pool.imap(_samtools_depth_wrapper, [(i,region_str,j,bam_index_dir,d) for j,i in bam_s.items()]), 1):
+            print(f'\r  * running samtools depth on region {region_str} for bam {k}/{len(bam_s)}', end='')
             pileups_df.append(r)
         print()
     pileups_df = pd.concat(pileups_df, axis=1)
