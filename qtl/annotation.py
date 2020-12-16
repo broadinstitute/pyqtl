@@ -354,6 +354,7 @@ class Annotation(object):
         self.transcripts = []
         self.gene_ids = []
         self.gene_names = []
+        self.header = []
 
         if isinstance(varin, list):
             self.genes = genes
@@ -367,10 +368,11 @@ class Annotation(object):
 
             with opener as gtf:
                 for row in gtf:
+                    if row[0]=='#':
+                        self.header.append(row.strip())
+                        continue
+
                     row = row.strip().split('\t')
-
-                    if row[0][0]=='#': continue # skip header
-
                     chrom = row[0]
                     # source = row[1]
                     annot_type = row[2]
@@ -401,8 +403,13 @@ class Annotation(object):
                             attributes['transcript_name'] = attributes['transcript_id']
                         if 'transcript_type' not in attributes:
                             attributes['transcript_type'] = 'unknown'
-                        t = Transcript(attributes.pop('transcript_id'), attributes.pop('transcript_name'), attributes.pop('transcript_type'), g, start_pos, end_pos)
+                        t = Transcript(attributes.pop('transcript_id'),
+                                       attributes.pop('transcript_name'),
+                                       attributes.pop('transcript_type'),
+                                       g, start_pos, end_pos)
+                        t.source = row[1]
                         t.attributes = attributes
+                        t.attributes_string = row[8]
                         g.transcripts.append(t)
                         self.transcript_dict[transcript_id] = t
                         self.transcripts.append(t)
@@ -412,6 +419,7 @@ class Annotation(object):
                             e = Exon(attributes['exon_id'], attributes['exon_number'], t, start_pos, end_pos)
                         else:
                             e = Exon(str(len(t.exons)+1), len(t.exons)+1, t, start_pos, end_pos)
+                        e.attributes_string = row[8]
                         t.exons.append(e)
 
 
@@ -767,6 +775,25 @@ class Annotation(object):
                 print('\r  * Loading mappability. Genes parsed: {0:5d}/{1:d}'.format(i+1,len(self.genes)), end='')
         print()
         bw.close()
+
+
+    def write_gtf(self, gtf_path):
+        """Write to GTF file. Only gene/transcript/exon features are used."""
+        with open(gtf_path, 'w') as gtf:
+            gtf.write('\n'.join(self.header)+'\n')
+            for g in self.genes:
+                gtf.write('\t'.join([g.chr, g.source, 'gene',
+                                     str(g.start_pos), str(g.end_pos),
+                                     '.', g.strand, '.', g.attributes_string])+'\n')
+
+                for t in g.transcripts:
+                    gtf.write('\t'.join([g.chr, t.source, 'transcript',
+                                         str(t.start_pos), str(t.end_pos),
+                                         '.', g.strand, '.', t.attributes_string])+'\n')
+                    for e in t.exons:
+                        gtf.write('\t'.join([g.chr, t.source, 'exon',
+                                             str(e.start_pos), str(e.end_pos),
+                                             '.', g.strand, '.', e.attributes_string])+'\n')
 
 
     def write_bed(self, bed_path, attribute='id', overwrite=False):
