@@ -341,6 +341,19 @@ def get_attributes(attr_str):
     return attributes
 
 
+def write_attributes(attr_dict):
+    s = []
+    for k,v in attr_dict.items():
+        if k == 'tags':
+            for t in v:
+                s.append(f'tag "{t}";')
+        elif k == 'level':
+            s.append(f'{k} {v};')
+        else:
+            s.append(f'{k} "{v}";')
+    return ' '.join(s)
+
+
 class Annotation(object):
 
     def __init__(self, varin, verbose=True):
