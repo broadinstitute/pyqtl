@@ -155,7 +155,9 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
 
     ax.set_xlabel(xlabel, fontsize=12, labelpad=8)
     ax.set_ylabel(ylabel, fontsize=12)
-    format_plot(ax, lw=1, fontsize=9)
+    format_plot(ax, lw=1, fontsize=9, x_offset=6, y_offset=6)
+    ax.set_xlim([-0.5,2.5])
+    ax.spines['bottom'].set_bounds([0, 2])
     ax.yaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=5, nbins=5))
     # ax.yaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=3, nbins=3))
 
@@ -644,7 +646,7 @@ def hexdensity(x, y, bounds=None, bins='log', scale='log',
 
     h = ax.hexbin(x, y, bins=bins, xscale=scale, yscale=scale, linewidths=0.1,
                   gridsize=gridsize, cmap=cmap, vmin=vmin, vmax=vmax, mincnt=1, zorder=1,
-                  clip_on=False, rasterized=rasterized)
+                  clip_on=True, rasterized=rasterized)
 
     # ax.set_xticks(ax.get_yticks())
     format_plot(ax, fontsize=fontsize-2)

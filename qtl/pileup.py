@@ -243,8 +243,9 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         c = gene.get_coverage(mappability_bigwig)
         mpax = fig.add_axes([dl/fw, 0.25/fh, aw/fw, da2/fh], sharex=axv[0])
         mpax.fill_between(xi, c, color=3*[0.6], lw=1, interpolate=False, rasterized=rasterized)
-
-        qtl_plot.format_plot(mpax, lw=0.6)
+        for i in ['top', 'right']:
+            mpax.spines[i].set_visible(False)
+            mpax.spines[i].set_linewidth(0.6)
         mpax.set_ylabel('Map.', fontsize=10, rotation=0, ha='right', va='center')
         mpax.tick_params(length=0, labelbottom=False)
         axv.append(mpax)
