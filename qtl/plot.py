@@ -499,13 +499,13 @@ def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=10000
 
 
 def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.Blues,
-               origin='lower', dendrogram_pos='top',
+               origin='lower', dendrogram_pos='top', ylabel_pos='left',
                cohort_s=None, cohort_colors=None, #cohort_labels=None,
                fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar_orientation='vertical',
                method='average', metric='euclidean', optimal_ordering=False, value_labels=False,
                rotation=-45, ha='left', va='top', tri=False,
                dl=1, dr=1, dt=0.2, lh=0.1, ls=0.01,
-               db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.175, dc=0.1):
+               db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.175, dc=0.1, dtc=0):
 
     if cohort_s is not None:
         if isinstance(cohort_s, pd.Series):
@@ -537,11 +537,13 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
                 fig.add_axes([dl/fw, (db+ah+(k+1)*ls+k*lh)/fh, aw/fw, lh/fh], sharex=ax)
             )
         dax = fig.add_axes([dl/fw,         (db+ah+n*(ls+lh)+ds)/fh, aw/fw, dd/fh])
-        cax = fig.add_axes([(dl+aw+dc)/fw, (db+ah-ch)/fh, cw/fw, ch/fh])
+        cax = fig.add_axes([(dl+aw+dc)/fw, (db+ah-ch-dtc)/fh, cw/fw, ch/fh])
+        axes = [ax, *lax, dax, cax]
     else:
         dax = fig.add_axes([dl/fw, db/fh, aw/fw, dd/fh])
         ax =  fig.add_axes([dl/fw, (db+dd+ds)/fh, aw/fw, ah/fh])
         cax = fig.add_axes([(dl+aw+dc)/fw, (db+dd+ds)/fh, cw/fw, ch/fh])
+        axes = [ax, dax, cax]
 
     if Zx is not None:
         with plt.rc_context({'lines.linewidth': lw}):
@@ -583,7 +585,11 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
         cmap2 = colors.ListedColormap([cohort_colors[k][j] for j in cohort_s[k].unique()], 'indexed')
         lax[k].imshow(cohort_index_s[ix].values.reshape(1,-1), aspect='auto', origin='lower', cmap=cmap2)
         # if cluster_labels is not None:
-        lax[k].set_ylabel(cohort_s[k].name, fontsize=10, rotation=0, va='center', ha='right')
+        if ylabel_pos == 'left':
+            lax[k].set_ylabel(cohort_s[k].name, fontsize=10, rotation=0, va='center', ha='right')
+        elif ylabel_pos == 'right':
+            lax[k].yaxis.set_label_position(ylabel_pos)
+            lax[k].set_ylabel(cohort_s[k].name, fontsize=10, rotation=0, va='center', ha='left')
         for i in lax[k].spines:
             lax[k].spines[i].set_visible(False)
         lax[k].set_xticks([])
@@ -620,13 +626,13 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
     ax.tick_params(length=0)
 
     plt.sca(ax)
-    return ax, cax
+    return axes
 
 
 def hexdensity(x, y, bounds=None, bins='log', scale='log',
                cmap=None, vmin=None, vmax=None, ax=None, cax=None,
                unit='TPM', entity='genes',
-               gridsize=175, fontsize=12, show_corr=True, rasterized=False):
+               gridsize=175, fontsize=12, show_corr=True, clip_on=True, rasterized=False):
     """Wrapper for hexbin"""
 
     if ax is None: # setup new axes
@@ -646,7 +652,7 @@ def hexdensity(x, y, bounds=None, bins='log', scale='log',
 
     h = ax.hexbin(x, y, bins=bins, xscale=scale, yscale=scale, linewidths=0.1,
                   gridsize=gridsize, cmap=cmap, vmin=vmin, vmax=vmax, mincnt=1, zorder=1,
-                  clip_on=True, rasterized=rasterized)
+                  clip_on=clip_on, rasterized=rasterized)
 
     # ax.set_xticks(ax.get_yticks())
     format_plot(ax, fontsize=fontsize-2)
