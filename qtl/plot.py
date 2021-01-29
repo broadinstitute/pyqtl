@@ -503,7 +503,7 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
                cohort_s=None, cohort_colors=None, #cohort_labels=None,
                fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar_orientation='vertical',
                method='average', metric='euclidean', optimal_ordering=False, value_labels=False,
-               rotation=-45, ha='left', va='top', tri=False,
+               rotation=-45, ha='left', va='top', tri=False, rasterized=False,
                dl=1, dr=1, dt=0.2, lh=0.1, ls=0.01,
                db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.175, dc=0.1, dtc=0):
 
@@ -573,7 +573,7 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
                 if not np.isnan(df.values[j,i]):
                     ax.text(i, j, '{:.2f}'.format(df.values[j,i]), ha='center', va='center')
 
-    h = ax.imshow(df, origin=origin, cmap=cmap, vmin=vmin, vmax=vmax, aspect='auto')
+    h = ax.imshow(df, origin=origin, cmap=cmap, vmin=vmin, vmax=vmax, rasterized=rasterized, aspect='auto')
     ax.set_xticks(np.arange(df.shape[1]))
     ax.set_yticks(np.arange(df.shape[0]))
     ax.set_xticklabels(ix, rotation=rotation, fontsize=fontsize, ha=ha, va=va)
