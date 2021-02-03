@@ -789,6 +789,16 @@ class Annotation(object):
         print()
         bw.close()
 
+    def get_tss_bed(self):
+        """Get DataFrame with [chr, TSS-1, TSS, gene_id] columns for each gene"""
+        bed_df = []
+        for g in self.genes:
+            bed_df.append([g.chr, g.tss-1, g.tss, g.id])
+        bed_df = pd.DataFrame(bed_df, columns=['chr', 'start', 'end', 'gene_id'])
+        bed_df.index = bed_df['gene_id']
+        # sort by start position
+        bed_df = bed_df.groupby('chr', sort=False, group_keys=False).apply(lambda x: x.sort_values('start'))
+        return bed_df
 
     def write_gtf(self, gtf_path):
         """Write to GTF file. Only gene/transcript/exon features are used."""
