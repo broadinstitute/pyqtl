@@ -19,6 +19,7 @@ import os
 import io
 import gzip
 import re
+from collections import Iterable
 
 from . import annotation
 from . import genotype as gt
@@ -186,7 +187,7 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
     return ax
 
 
-def plot_locus(pvals, gene_id=None, variant_ids=None, annot=None, r2_s=None, rs_id=None, show_rsid=True,
+def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_rsid=True,
                highlight_ids=None, credible_sets=None,
                tracks=None, track_colors=None,
                shared_only=True,
@@ -196,6 +197,7 @@ def plot_locus(pvals, gene_id=None, variant_ids=None, annot=None, r2_s=None, rs_
                single_ylabel=False, ylabel='-log$\mathregular{_{10}}$(p-value)', rasterized=False):
     """
       pvals: pd.DataFrame, or list of pd.DataFrame. Must contain 'pval_nominal' and 'position' columns.
+      gene: qtl.annotation.Gene, or list thereof
       shared_only: only plot variants that are present in all inputs
       sharey: list of dataset indexes with shared ylim
     """
@@ -203,6 +205,8 @@ def plot_locus(pvals, gene_id=None, variant_ids=None, annot=None, r2_s=None, rs_
     if isinstance(pvals, pd.DataFrame):
         pvals = [pvals]
     n = len(pvals)
+    if not isinstance(gene, Iterable):
+        gene = [gene]
 
     if variant_ids is None:
         variant_ids = []
@@ -225,7 +229,7 @@ def plot_locus(pvals, gene_id=None, variant_ids=None, annot=None, r2_s=None, rs_
         dt = 0.5
     fw = dl + aw + dr
     fh = db + n*ah + (n-1)*ds + dt
-    if gene_id is not None:
+    if gene[0] is not None:
         fh += gh
     else:
         gh = 0
@@ -237,7 +241,7 @@ def plot_locus(pvals, gene_id=None, variant_ids=None, annot=None, r2_s=None, rs_
         axes.append(fig.add_axes([dl/fw, (fh-dt-ah-i*(ah+ds))/fh, aw/fw, ah/fh], sharex=axes[0]))
     if tracks is not None:
         tax = fig.add_axes([dl/fw, (fh-dt-n*(ah+ds)-th)/fh, aw/fw, th/fh], sharex=axes[0])
-    if gene_id is not None:
+    if gene[0] is not None:
         gax = fig.add_axes([dl/fw, (db)/fh, aw/fw, gh/fh], sharex=axes[0])
 
     if xlim is None:
@@ -422,7 +426,7 @@ def plot_locus(pvals, gene_id=None, variant_ids=None, annot=None, r2_s=None, rs_
             tax.spines[i].set_visible(False)
         tax.set_ylim([0, ntracks])
 
-    if gene_id is None or annot.gene_dict[gene_id].chr != chrom:
+    if gene[0] is None or gene[0].chr != chrom:
         axes[-1].xaxis.tick_bottom()
         axes[-1].xaxis.set_label_position('bottom')
         axes[-1].spines['bottom'].set_visible(True)
@@ -431,30 +435,35 @@ def plot_locus(pvals, gene_id=None, variant_ids=None, annot=None, r2_s=None, rs_
         axes[-1].set_xlabel('Position on {} (Mb)'.format(chrom), fontsize=14)
         axes[-1].set_xticklabels(axes[-1].get_xticks()/1e6)
     else:   # add gene model
-        gene = annot.gene_dict[gene_id]
         #  plot gene model and annotate
-        if gene.end_pos < xlim[0]:
+        if gene[0].end_pos < xlim[0]:
             x = gh/aw/2
             v = np.array([[x,0.2], [x-0.8*gh/aw, 0.5], [x,0.8]])
             polygon = patches.Polygon(v, True, color='k', transform=gax.transAxes, clip_on=False)
             gax.add_patch(polygon)
-            txt = '{} (~{:.1f}Mb)'.format(gene.name, (pos-gene.tss)/1e6)
+            txt = '{} (~{:.1f}Mb)'.format(gene[0].name, (pos-gene[0].tss)/1e6)
             gax.set_ylim([-1,1])
             gax.text(1.5*x, 0.5, txt, va='center', ha='left', transform=gax.transAxes)
-        elif gene.start_pos > xlim[1]:
+        elif gene[0].start_pos > xlim[1]:
             x = 1 - gh/aw/2
             v = np.array([[x,0.2], [x+0.8*gh/aw, 0.5], [x,0.8]])
             polygon = patches.Polygon(v, True, color='k', transform=gax.transAxes, clip_on=False)
             gax.add_patch(polygon)
-            txt = '{} (~{:.1f}Mb)'.format(gene.name, (gene.tss-pos)/1e6)
+            txt = '{} (~{:.1f}Mb)'.format(gene[0].name, (gene[0].tss-pos)/1e6)
             gax.set_ylim([-1,1])
             gax.text(1 - gh/aw/2*1.5, 0.5, txt, va='center', ha='right', transform=gax.transAxes)
         else:
-            gene.plot(ax=gax, max_intron=1e9, fc='k', ec='none', reference=1, scale=0.33, show_ylabels=False, clip_on=True)
-            if gene_label_pos=='right':
-                gax.annotate(gene.name, (np.minimum(gene.end_pos, xlim[1]), 0), xytext=(5,0), textcoords='offset points', va='center', ha='left')
-            else:
-                gax.annotate(gene.name, (np.maximum(gene.start_pos, xlim[0]), 0), xytext=(-5,0), textcoords='offset points', va='center', ha='right')
+            m = np.mean(xlim)
+            for k,g in enumerate(gene[::-1]):
+                y = len(gene)-1-k
+                # y = k
+                # print(xlim)
+                g.plot(ax=gax, yoffset=k, max_intron=1e9, fc='k', ec='none', reference=1, scale=0.33, show_ylabels=False, clip_on=True)
+                # if gene_label_pos=='right':
+                if gene[k].end_pos - m > m - gene[k].start_pos:
+                    gax.annotate(gene[k].name, (np.minimum(gene[k].end_pos, xlim[1]), y), xytext=(5,0), textcoords='offset points', va='center', ha='left')
+                else:
+                    gax.annotate(gene[k].name, (np.maximum(gene[k].start_pos, xlim[0]), y), xytext=(-5,0), textcoords='offset points', va='center', ha='right')
 
         if chr_label_pos=='bottom':
             gax.set_xlabel('Position on {} (Mb)'.format(chrom), fontsize=14)
@@ -507,9 +516,9 @@ def plot_ieqtl_locus(eqtl_df, ieqtl_df, gwas_df, r2_s, gene_id, variant_id, anno
     else:
         labels.extend(['eQTL (PP4 = {:.2f})'.format(pp4[0]), 'ieQTL (PP4 = {:.2f})'.format(pp4[1])])
 
-    plot_locus(pvals, r2_s, gene_id, variant_id, annot, rs_id=rs_id,
-                    highlight_ids=None, aw=aw, ah=ah,
-                    labels=labels, shade_range=None, gene_label_pos='right', chr_label_pos='bottom', window=window)
+    plot_locus(pvals, variant_ids=variant_id, r2_s=r2_s, gene=annot.gene_dict[gene_id], rs_id=rs_id,
+               highlight_ids=None, aw=aw, ah=ah,
+               labels=labels, shade_range=None, gene_label_pos='right', chr_label_pos='bottom', window=window)
 
 
 
