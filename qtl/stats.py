@@ -14,7 +14,7 @@ class Residualizer(object):
             if fail_colinear:
                 raise ValueError("Colinear or zero covariates detected")
             else:  # drop colinear covariates
-                print('  * dropped colinear covariates: {}'.format(np.sum(colinear_ix)))
+                print(f'  * dropped colinear covariates: {np.sum(colinear_ix)}')
                 self.Q = self.Q[:, ~colinear_ix]
 
     def transform(self, df, center=False):
@@ -110,7 +110,7 @@ def bootstrap_pi1(pval, lambda_qvalue=0.5, bounds=[2.5, 97.5], n=1000):
         except:
             nfail += 1
     if nfail > 0:
-        print('Warning: {} bootstraps failed'.format(nfail))
+        print(f'Warning: {nfail} bootstraps failed')
     pi1_boot = np.array(pi1_boot)
     if len(pi1_boot) > 0:
         ci = np.percentile(pi1_boot, bounds)

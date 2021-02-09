@@ -28,7 +28,7 @@ from . import genotype as gt
 def get_sample_ids(vcf):
     """Get sample IDs from VCF"""
     if vcf.endswith('.bcf'):
-        return subprocess.check_output('bcftools query -l {}'.format(vcf), shell=True).decode().strip().split('\n')
+        return subprocess.check_output(f'bcftools query -l {vcf}', shell=True).decode().strip().split('\n')
     else:
         with gzip.open(vcf, 'rt') as f:
             for line in f:
@@ -45,12 +45,12 @@ def get_cis_genotypes(chrom, tss, vcf, field='GT', window=1000000):
 
 def get_genotypes_region(vcf, region, field='GT'):
     """Get dosages from VCF (using tabix)"""
-    print('Getting {} for region {}'.format(field, region))
+    print(f'Getting {field} for region {region}')
     cmd = 'tabix '+vcf+' '+region
     s = subprocess.check_output(cmd, shell=True, executable='/bin/bash')
     s = s.decode().strip()
     if len(s)==0:
-        raise ValueError('No variants in region {}'.format(region))
+        raise ValueError(f'No variants in region {region}')
     s = s .split('\n')
     variant_ids = [si.split('\t', 3)[-2] for si in s]
     field_ix = s[0].split('\t')[8].split(':').index(field)
@@ -75,7 +75,7 @@ def load_eqtl(eqtl_file, gene_id, chrom=None):
         eqtl_df = pd.read_parquet(p, columns=cols)
         eqtl_df = eqtl_df[eqtl_df['phenotype_id']==gene_id].set_index('variant_id').rename(columns={'pval_gi':'pval_nominal'})
     else:
-        s = subprocess.check_output('zcat {} | grep {}'.format(eqtl_file, gene_id), shell=True).decode()
+        s = subprocess.check_output(f'zcat {eqtl_file} | grep {gene_id}', shell=True).decode()
         eqtl_cols = ['gene_id', 'variant_id', 'tss_distance', 'ma_samples', 'ma_count', 'maf', 'pval_nominal', 'slope', 'slope_se']
         eqtl_df = pd.read_csv(io.StringIO(s), sep='\t', header=None, names=eqtl_cols, index_col=1)
     eqtl_df['position'] = eqtl_df.index.map(lambda x: int(x.split('_')[1]))
@@ -110,7 +110,7 @@ def get_ld(vcf, variant_id, phenotype_bed, window=200000):
 
 
 def get_rsid(id_lookup_table, variant_id):
-    s = subprocess.check_output('zcat {} | grep {}'.format(id_lookup_table, variant_id), shell=True).decode()
+    s = subprocess.check_output(f'zcat {id_lookup_table} | grep {variant_id}', shell=True).decode()
     rs_id = [i for i in s.strip().split('\t') if i.startswith('rs')]
     assert len(rs_id)==1
     return rs_id[0]
@@ -432,7 +432,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
         axes[-1].spines['bottom'].set_visible(True)
         axes[-1].tick_params(axis='x', pad=2)
         axes[-1].xaxis.labelpad = 8
-        axes[-1].set_xlabel('Position on {} (Mb)'.format(chrom), fontsize=14)
+        axes[-1].set_xlabel(f'Position on {chrom} (Mb)', fontsize=14)
         axes[-1].set_xticklabels(axes[-1].get_xticks()/1e6)
     else:   # add gene model
         #  plot gene model and annotate
@@ -441,7 +441,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
             v = np.array([[x,0.2], [x-0.8*gh/aw, 0.5], [x,0.8]])
             polygon = patches.Polygon(v, True, color='k', transform=gax.transAxes, clip_on=False)
             gax.add_patch(polygon)
-            txt = '{} (~{:.1f}Mb)'.format(gene[0].name, (pos-gene[0].tss)/1e6)
+            txt = f'{gene[0].name} (~{(pos-gene[0].tss)/1e6:.1f}Mb)'
             gax.set_ylim([-1,1])
             gax.text(1.5*x, 0.5, txt, va='center', ha='left', transform=gax.transAxes)
         elif gene[0].start_pos > xlim[1]:
@@ -449,7 +449,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
             v = np.array([[x,0.2], [x+0.8*gh/aw, 0.5], [x,0.8]])
             polygon = patches.Polygon(v, True, color='k', transform=gax.transAxes, clip_on=False)
             gax.add_patch(polygon)
-            txt = '{} (~{:.1f}Mb)'.format(gene[0].name, (gene[0].tss-pos)/1e6)
+            txt = f'{gene[0].name} (~{(gene[0].tss-pos)/1e6:.1f}Mb)'
             gax.set_ylim([-1,1])
             gax.text(1 - gh/aw/2*1.5, 0.5, txt, va='center', ha='right', transform=gax.transAxes)
         else:
@@ -466,7 +466,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
                     gax.annotate(gene[k].name, (np.maximum(gene[k].start_pos, xlim[0]), y), xytext=(-5,0), textcoords='offset points', va='center', ha='right')
 
         if chr_label_pos=='bottom':
-            gax.set_xlabel('Position on {} (Mb)'.format(chrom), fontsize=14)
+            gax.set_xlabel(f'Position on {chrom} (Mb)', fontsize=14)
         else:
             plt.setp(gax.get_xticklabels(), visible=False)
             for line in gax.xaxis.get_ticklines():
@@ -486,7 +486,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
     if chr_label_pos!='bottom':
         axes[0].xaxis.tick_top()
         axes[0].xaxis.set_label_position('top')
-        axes[0].set_xlabel('Position on {} (Mb)'.format(chrom), fontsize=14)
+        axes[0].set_xlabel(f'Position on {chrom} (Mb)', fontsize=14)
         axes[0].spines['top'].set_visible(True)
         axes[0].tick_params(axis='x', pad=2)
         axes[0].xaxis.labelpad = 8
@@ -514,7 +514,7 @@ def plot_ieqtl_locus(eqtl_df, ieqtl_df, gwas_df, r2_s, gene_id, variant_id, anno
     if pp4 is None:
         labels.extend(['eQTL', 'ieQTL'])
     else:
-        labels.extend(['eQTL (PP4 = {:.2f})'.format(pp4[0]), 'ieQTL (PP4 = {:.2f})'.format(pp4[1])])
+        labels.extend([f'eQTL (PP4 = {pp4[0]:.2f})', f'ieQTL (PP4 = {pp4[1]:.2f})'])
 
     plot_locus(pvals, variant_ids=variant_id, r2_s=r2_s, gene=annot.gene_dict[gene_id], rs_id=rs_id,
                highlight_ids=None, aw=aw, ah=ah,
@@ -593,7 +593,7 @@ if __name__=='__main__':
                ymax=args.ymax, sharey=args.sharey,
                window=args.window, shared_only=True)
 
-    pdf_file = os.path.join(args.output_dir, '{}.{}.locus_plot.pdf'.format(gene.name, variant_id))
+    pdf_file = os.path.join(args.output_dir, f'{gene.name}.{variant_id}.locus_plot.pdf')
     plt.savefig(pdf_file)
 
     print('Done.')

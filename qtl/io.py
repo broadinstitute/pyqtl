@@ -59,7 +59,7 @@ def write_gct(df, gct_file, float_format='%.6g'):
         opener = open(gct_file, 'w')
 
     with opener as gct:
-        gct.write('#1.2\n{0:d}\t{1:d}\n'.format(df.shape[0], df.shape[1]-1))
+        gct.write(f'#1.2\n{df.shape[0]:d}\t{df.shape[1]-1:d}\n')
         df.to_csv(gct, sep='\t', float_format=float_format)
 
 

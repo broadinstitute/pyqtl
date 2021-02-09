@@ -76,9 +76,9 @@ class Exon(object):
         self.length = end_pos-start_pos+1
 
     def __str__(self, ref=1):
-        return 'exon_id: ' + self.id + '; exon_number: {0:2d}'.format(self.number)\
-            + '; pos.: {0:d}-{1:d}'.format(self.start_pos-ref+1, self.end_pos-ref+1)\
-            + '; length: {0:d}'.format(self.length)
+        return f'exon_id: {self.id}; exon_number: {self.number:2d}'\
+            + f'; pos.: {self.start_pos-ref+1:d}-{self.end_pos-ref+1:d}'\
+            + f'; length: {self.length:d}'
 
     def __eq__(self, other):
         return (self.start_pos, self.end_pos)==(other.start_pos, other.end_pos)
@@ -116,9 +116,9 @@ class Transcript(object):
 
     def __str__(self, ref=1):
         """Print text representation of transcript structure"""
-        rep = ['Transcript: ' + self.id + ' (' + self.name + '): ' + self.type +\
-            '; pos.: {0:d}-{1:d}'.format(self.start_pos-ref+1, self.end_pos-ref+1) +\
-            '; length: {0:d}'.format( sum([e.length for e in self.exons]) )]
+        rep = [f'Transcript: {self.id} ({self.name}): {self.type}' +\
+            f'; pos.: {self.start_pos-ref+1:d}-{self.end_pos-ref+1:d}' +\
+            f'; length: {sum([e.length for e in self.exons]):d}']
         rep += ['    '+i.__str__(ref) for i in self.exons]
         return '\n'.join(rep)
 
@@ -144,12 +144,12 @@ class Gene(object):
 
     def __str__(self, ref=1):
         """Print gene/isoform structure"""
-        rep = 'Gene: ' + self.name + ' (' + self.id + '): ' + self.type + '; chr. ' + str(self.chr) +\
-             ": {0:d}-{1:d}".format(self.start_pos-ref+1, self.end_pos-ref+1) + ' (' + self.strand + ')'
+        rep = f'Gene: {self.name} ({self.id}): {self.type}; chr. {self.chr}' +\
+             f": {self.start_pos-ref+1:d}-{self.end_pos-ref+1:d} ({self.strand})"
         if len(self.transcripts)>1:
-            rep = rep + '; '+str(len(self.transcripts))+' isoforms'
+            rep = rep + f'; {len(self.transcripts)} isoforms'
         if isinstance(self.mappability, float):
-            rep = rep + '; Mappability: {0:.4f}'.format(self.mappability)
+            rep = rep + f'; Mappability: {self.mappability:.4f}'
 
         rep = [rep] + [i.__str__(ref) for i in self.transcripts]
         return '\n'.join(rep)
@@ -305,7 +305,7 @@ class Gene(object):
         if coverage is not None:
             # only plot first max_intron bases of introns
             if not ce[-1][1]-ce[0][0]+1 == len(coverage):
-                raise ValueError('Coverage ({}) does not match gene length ({})'.format(len(coverage), ce[-1][1]-ce[0][0]+1))
+                raise ValueError(f'Coverage ({len(coverage)}) does not match gene length ({ce[-1][1]-ce[0][0]+1})')
             # coordinates:
             pidx = [np.arange(ce[0][0],ce[0][1]+1)]
             for i in range(1,ce.shape[0]):
@@ -470,9 +470,9 @@ class Annotation(object):
                         pass
 
                     if np.mod(len(self.genes), 1000)==0 and verbose:
-                        print('\rGenes parsed: {}'.format(len(self.genes)), end='')
+                        print(f'\rGenes parsed: {len(self.genes)}', end='')
             if verbose:
-                print('\rGenes parsed: {}'.format(len(self.genes)))
+                print(f'\rGenes parsed: {len(self.genes)}')
 
         self.gene_ids = np.array(self.gene_ids)
         self.gene_names = np.array(self.gene_names)
@@ -785,7 +785,7 @@ class Annotation(object):
             g.mappability = gm
             # ex.append(gm)
             if np.mod(i+1,100)==0 or i==len(self.genes)-1:
-                print('\r  * Loading mappability. Genes parsed: {0:5d}/{1:d}'.format(i+1,len(self.genes)), end='')
+                print(f'\r  * Loading mappability. Genes parsed: {i+1:5d}/{len(self.genes):d}', end='')
         print()
         bw.close()
 

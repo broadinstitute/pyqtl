@@ -170,15 +170,15 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             if show_counts:
                 gcounts = g.astype(int).value_counts()
                 ax.set_xticklabels([
-                    '{0}/{0}\n({1})'.format(ref, gcounts.get(0, 0)),
-                    '{0}/{1}\n({2})'.format(ref, alt, gcounts.get(1, 0)),
-                    '{0}/{0}\n({1})'.format(alt, gcounts.get(2, 0)),
+                    f'{ref}/{ref}\n({gcounts.get(0, 0)})',
+                    f'{ref}/{alt}\n({gcounts.get(1, 0)})',
+                    f'{alt}/{alt}\n({gcounts.get(2, 0)})',
                 ])
             else:
                 ax.set_xticklabels([
-                    '{0}/{0}'.format(ref),
-                    '{0}/{1}'.format(ref, alt),
-                    '{0}/{0}'.format(alt),
+                    f'{ref}/{ref}',
+                    f'{ref}/{alt}',
+                    f'{alt}/{alt}',
                 ])
         else:
             var_s = eqtl_df[eqtl_df.columns[2]]
@@ -188,9 +188,9 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             gcounts1 = g[var_s==c[0]].value_counts().reindex(np.arange(3), fill_value=0)
             gcounts2 = g[var_s==c[1]].value_counts().reindex(np.arange(3), fill_value=0)
             ax.set_xticklabels([
-                '{0}/{0}\n({1},{2})'.format(ref, gcounts1[0], gcounts2[0]),
-                '{0}/{1}\n({2},{3})'.format(ref, alt, gcounts1[1], gcounts2[1]),
-                '{0}/{0}\n({1},{2})'.format(alt, gcounts1[2], gcounts2[2]),
+                f'{ref}/{ref}\n({gcounts1[0]},{gcounts2[0]})',
+                f'{ref}/{alt}\n({gcounts1[1]},{gcounts2[1]})',
+                f'{alt}/{alt}\n({gcounts1[2]},{gcounts2[2]})',
             ])
 
     return ax
@@ -223,9 +223,9 @@ def plot_interaction(p, g, i, variant_id=None, annot=None, covariates_df=None, l
     else:
         ref, alt = 'ref', 'alt'
     labels = {
-        0:'{0}/{0}'.format(ref),
-        1:'{}/{}'.format(ref, alt),
-        2:'{0}/{0}'.format(alt),
+        0: f'{ref}/{ref}',
+        1: f'{ref}/{alt}',
+        2: f'{alt}/{alt}',
     }
 
     ax = setup_figure(ah, aw)
@@ -350,7 +350,7 @@ def plot_ld(ld_df, ld_threshold=0.1, s=0.25, alpha=1, yscale=3,
         ax.spines[s].set_visible(False)
     ax.set_yticks([])
 
-    ax.set_xlabel('Position on {} (Mb)'.format(variant_df['chr'][0]), fontsize=14)
+    ax.set_xlabel(f"Position on {variant_df['chr'][0]} (Mb)", fontsize=14)
     return ax
 
 
@@ -492,7 +492,7 @@ def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=10000
 
     ax.spines['left'].set_position(('outward', 6))
     ax.spines['bottom'].set_position(('outward', 6))
-    ax.set_title('{}'.format(title), fontsize=12)
+    ax.set_title(f'{title}', fontsize=12)
     if labels[0] != '':
         ax.legend(loc='upper left', fontsize=10, handlelength=0.5, handletextpad=0.33)
     return ax
@@ -571,7 +571,7 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
         for i in irange:
             for j in jrange:
                 if not np.isnan(df.values[j,i]):
-                    ax.text(i, j, '{:.2f}'.format(df.values[j,i]), ha='center', va='center')
+                    ax.text(i, j, f'{df.values[j,i]:.2f}', ha='center', va='center')
 
     h = ax.imshow(df, origin=origin, cmap=cmap, vmin=vmin, vmax=vmax, rasterized=rasterized, aspect='auto')
     ax.set_xticks(np.arange(df.shape[1]))
@@ -678,8 +678,8 @@ def hexdensity(x, y, bounds=None, bins='log', scale='log',
     hc.set_label('log$\mathregular{_{10}}$('+entity+')', fontsize=fontsize)
 
     if isinstance(x, pd.Series):
-        ax.set_xlabel('{} ({})'.format(x.name, unit), fontsize=fontsize)
+        ax.set_xlabel(f'{x.name} ({unit})', fontsize=fontsize)
     if isinstance(y, pd.Series):
-        ax.set_ylabel('{} ({})'.format(y.name, unit), fontsize=fontsize)
+        ax.set_ylabel(f'{y.name} ({unit})', fontsize=fontsize)
 
     return ax, cax

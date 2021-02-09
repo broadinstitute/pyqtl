@@ -50,6 +50,6 @@ def get_pcs(gct_df, normalize=True, C=None, n_components=5):
     pca.fit(gct_norm_std_df.T)
     P = pca.transform(gct_norm_std_df.T)
     pc_df = pd.DataFrame(P, index=gct_norm_std_df.columns,
-                        columns=['PC{}'.format(i) for i in range(1, P.shape[1]+1)])
+                        columns=[f'PC{i}' for i in range(1, P.shape[1]+1)])
     pve_s = pd.Series(pca.explained_variance_ratio_ * 100, index=pc_df.columns, name='pve')
     return pc_df, pve_s

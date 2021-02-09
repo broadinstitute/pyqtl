@@ -122,10 +122,10 @@ def combine_abf(l1, l2, p1=1e-4, p2=1e-4, p12=1e-5, verbose=False):
     all_abf = [lh0_abf, lh1_abf, lh2_abf, lh3_abf, lh4_abf]
     my_denom_log_abf = logsum(all_abf)  # denominator in eq. 2
     pp_abf = np.exp(all_abf - my_denom_log_abf)
-    pp_abf = pd.Series(pp_abf, index=['pp_h{}_abf'.format(i) for i in range(5)])
+    pp_abf = pd.Series(pp_abf, index=[f'pp_h{i}_abf' for i in range(5)])
     if verbose:
         print(pp_abf)
-        print('PP abf for shared variant: {:.1f}%'.format(pp_abf['pp_h4_abf']*100))
+        print(f"PP abf for shared variant: {pp_abf['pp_h4_abf']*100:.1f}%")
     return pp_abf
 
 

@@ -137,9 +137,9 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         chrom,pos,ref,alt = variant_id.split('_')[:4]
         pos = int(pos)
         gtlabels = np.array([
-            '{0}{0}'.format(ref),
-            '{0}{1}'.format(ref, alt),
-            '{0}{0}'.format(alt)
+            f'{ref}{ref}',
+            f'{ref}{alt}',
+            f'{alt}{alt}',
         ])
     else:
         pos = None
@@ -190,7 +190,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         ax.set_xticks(xinterp)
         ax.set_xticklabels([])
         ax.spines['left'].set_position(('outward', 6))
-    axv[0].set_xlabel('Exon coordinates on {}'.format(gene.chr), fontsize=12)
+    axv[0].set_xlabel(f'Exon coordinates on {gene.chr}', fontsize=12)
 
     if gtlabels is None:
         leg = axv[-1].legend(loc='lower left', labelspacing=0.15, frameon=False, fontsize=9, borderaxespad=0.5,
@@ -202,7 +202,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         line.set_linewidth(1)
 
     if variant_id is not None and title is None:
-        axv[-1].set_title('{} :: {}'.format(variant_id, gene.name), fontsize=10)
+        axv[-1].set_title(f'{variant_id} :: {gene.name}', fontsize=10)
     else:
         axv[-1].set_title(title, fontsize=10)
 

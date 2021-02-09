@@ -197,7 +197,7 @@ def get_conditional_pvalues(group_df, genotypes, phenotype_df, covariates_df, ph
         res.append(pval_df)
 
     for k,(variant_id, phenotype_id) in enumerate(zip(group_df['variant_id'], group_df['phenotype_id']), 1):
-        print('\rProcessing {}/{}'.format(k, group_df.shape[0]), end='')
+        print(f'\rProcessing {k}/{group_df.shape[0]}', end='')
         covariates = pd.concat([covariates_df, gt_df.loc[np.setdiff1d(group_df['variant_id'], variant_id)].T], axis=1)
         pval_df = calculate_association(gt_df, phenotype_df.loc[phenotype_id], covariates_df=covariates)
         pval_df['r2'] = compute_ld(gt_df, variant_id)

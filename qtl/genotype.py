@@ -51,7 +51,7 @@ class GenotypeIndexer(object):
 def get_sample_ids(vcf):
     """Get sample IDs"""
     if vcf.endswith('.bcf'):
-        return subprocess.check_output('bcftools query -l {}'.format(vcf), shell=True).decode().strip().split('\n')
+        return subprocess.check_output(f'bcftools query -l {vcf}', shell=True).decode().strip().split('\n')
     else:
         with gzip.open(vcf, 'rt') as f:
             for line in f:
@@ -68,7 +68,7 @@ def get_contigs(vcfpath):
 
 def get_variant_ids(vcf):
     """Get list of variant IDs ('ID' field)"""
-    s = subprocess.check_output('zcat {} | grep -v "#" | cut -f3'.format(vcf), shell=True)
+    s = subprocess.check_output(f'zcat {vcf} | grep -v "#" | cut -f3', shell=True)
     return s.strip(b'\n').split(b'\n')
 
 
@@ -80,11 +80,11 @@ def get_cis_genotypes(chrom, tss, vcf, field='GT', dosages=True, window=1000000)
 
 def get_genotypes_region(vcf, region, field='GT', dosages=True):
     """Get genotypes, using region (chr:start-end) string"""
-    s = subprocess.check_output('tabix {} {}'.format(vcf, region),
+    s = subprocess.check_output(f'tabix {vcf} {region}',
                                 shell=True, executable='/bin/bash')
     s = s.decode().strip()
     if len(s)==0:
-        raise ValueError('No variants in region {}'.format(region))
+        raise ValueError(f'No variants in region {region}')
     s = s .split('\n')
     variant_ids = [si.split('\t', 3)[-2] for si in s]
     field_ix = s[0].split('\t')[8].split(':').index(field)
@@ -114,7 +114,7 @@ def impute_mean(df, missing=lambda x: np.isnan(x), verbose=True):
             n += 1
 
     if verbose and n > 0:
-        print('  * imputed at least 1 sample in {} sites'.format(n))
+        print(f'  * imputed at least 1 sample in {n} sites')
 
 
 def get_genotype(variant_id, vcf, field='GT', convert_gt=True, sample_ids=None):
@@ -131,7 +131,7 @@ def get_genotype(variant_id, vcf, field='GT', convert_gt=True, sample_ids=None):
     chrom, pos = variant_id.split('_')[:2]
     s = subprocess.check_output('tabix '+vcf+' '+chrom+':'+pos+'-'+str(int(pos)+1), shell=True)
     if len(s) == 0:
-        raise ValueError("Variant '{}' not found in VCF.".format(variant_id))
+        raise ValueError(f"Variant '{variant_id}' not found in VCF.")
 
     s = s.decode().strip()
     if '\n' in s:
@@ -173,7 +173,7 @@ def get_genotypes(variant_ids, vcf, field='GT'):
         df['pos'] = df['pos'].astype(int)
         df = df.sort_values(['chr', 'pos'])
         df.to_csv(regions_file.name, sep='\t', index=False, header=False)
-        s = subprocess.check_output('tabix {} --regions {}'.format(vcf, regions_file.name), shell=True)
+        s = subprocess.check_output(f'tabix {vcf} --regions {regions_file.name}', shell=True)
 
     s = s.decode().strip().split('\n')
     s = [i.split('\t') for i in s]
@@ -194,8 +194,8 @@ def get_genotypes(variant_ids, vcf, field='GT'):
 def load_vcf(vcf):
     """Load dosages as DataFrame"""
 
-    nvariants = int(subprocess.check_output('bcftools index -n {}'.format(vcf), shell=True).decode())
-    sample_ids = subprocess.check_output('bcftools query -l {}'.format(vcf), shell=True).decode().strip().split()
+    nvariants = int(subprocess.check_output(f'bcftools index -n {vcf}', shell=True).decode())
+    sample_ids = subprocess.check_output(f'bcftools query -l {vcf}', shell=True).decode().strip().split()
     nsamples = len(sample_ids)
     dosages = np.zeros([nvariants, nsamples], dtype=np.float32)
 
@@ -219,7 +219,7 @@ def load_vcf(vcf):
             variant_ids.append(line[2])
             dosages[k,:] = [gt_dosage_dict[i.split(':')[gt_ix]] for i in line[9:]]
             if np.mod(k,1000)==0:
-                print('\rVariants processed: {}'.format(k), end='')
+                print(f'\rVariants processed: {k}', end='')
 
     return pd.DataFrame(dosages, index=variant_ids, columns=sample_ids)
 
