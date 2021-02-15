@@ -224,7 +224,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
     pos = int(pos)
 
     # set up figure
-    if chr_label_pos!='bottom':
+    if chr_label_pos != 'bottom':
         db = 0.25
         dt = 0.5
     fw = dl + aw + dr
@@ -403,7 +403,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
         for k in sharey:
             axes[k-1].set_ylim([0, shared_max])
 
-    if tracks is not None:  # plot, e.g., ATAC-seq tracks
+    if tracks is not None and len(tracks) > 0:  # plot, e.g., ATAC-seq tracks
         ntracks = tracks.shape[1]
         x = tracks.index
         maxv = tracks.max().max()
