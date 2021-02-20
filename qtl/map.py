@@ -9,6 +9,7 @@ import pandas as pd
 import scipy.stats
 from . import stats
 from . import genotype as gt
+from . import locusplot
 
 
 def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True):
@@ -53,7 +54,7 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
     df = pd.DataFrame(pval, index=tstat.index, columns=['pval_nominal'])
     df['slope'] = r * n
     df['slope_se'] = df['slope'] / tstat
-    df['r2'] = r*r
+    df['corr_r2'] = r*r
     df['tstat'] = tstat
     n2 = 2*genotype_df.shape[1]
     af = genotype_df.sum(1) / n2
@@ -65,6 +66,7 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
     df['ma_samples'] = np.where(ix, a, b)
     a = (genotype_df * m).sum(1).round().astype(int)  # round for missing/imputed genotypes
     df['ma_count'] = np.where(ix, a, n2-a)
+    df['r2'] = locusplot.compute_ld(genotype, df['pval_nominal'].idxmin())
 
     if isinstance(df.index[0], str) and '_' in df.index[0]:
         df['chr'] = df.index.map(lambda x: x.split('_')[0])
