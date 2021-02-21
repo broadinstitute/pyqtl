@@ -656,7 +656,7 @@ def hexdensity(x, y, bounds=None, bins='log', scale='log',
                   clip_on=clip_on, rasterized=rasterized)
 
     # ax.set_xticks(ax.get_yticks())
-    format_plot(ax, fontsize=fontsize-2)
+    format_plot(ax, fontsize=fontsize-2, x_offset=6, y_offset=6)
     if bounds is None:
         xlim = ax.get_xlim()
         ylim = ax.get_ylim()
@@ -667,8 +667,6 @@ def hexdensity(x, y, bounds=None, bins='log', scale='log',
     else:
         ax.set_xlim(bounds[:2])
         ax.set_ylim(bounds[2:])
-    ax.spines['left'].set_position(('outward', 6))
-    ax.spines['bottom'].set_position(('outward', 6))
 
     if show_corr:
         t = ax.text(1, 0, r'$\rho$ = {:.2f}'.format(rho), transform=ax.transAxes,

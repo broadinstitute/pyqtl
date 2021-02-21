@@ -376,7 +376,8 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
     else:
         for k,ax in enumerate(axes):
             ax.set_ylabel(ylabels[k], fontsize=12)#, labelpad=15)
-            ax.yaxis.set_label_coords(-0.07*4/aw, 0.5)
+            if 'p-value' in ylabels[k]:
+                ax.yaxis.set_label_coords(-0.07*4/aw, 0.5)
 
     for ax in axes:
         ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True, min_n_ticks=3, nbins=4))
