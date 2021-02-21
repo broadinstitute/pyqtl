@@ -299,7 +299,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
         elif 'pip' in pval_df:
             p = window_df['pip']
             ylabels.append('PIP')
-            minp = pval_df['pip'].max()
+            minp = pval_df.loc[variant_id, 'pip']
             if 'cs_id' in pval_df:
                 pip_df = pval_df[pval_df['cs_id'].notnull()].copy()
                 pip_df['cs_id'] = pip_df['cs_id'].astype(int)
