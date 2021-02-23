@@ -66,7 +66,8 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
     df['ma_samples'] = np.where(ix, a, b)
     a = (genotype_df * m).sum(1).round().astype(int)  # round for missing/imputed genotypes
     df['ma_count'] = np.where(ix, a, n2-a)
-    df['r2'] = locusplot.compute_ld(genotype, df['pval_nominal'].idxmin())
+    if isinstance(genotype, pd.DataFrame):
+        df['r2'] = locusplot.compute_ld(genotype, df['pval_nominal'].idxmin())
 
     if isinstance(df.index[0], str) and '_' in df.index[0]:
         df['chr'] = df.index.map(lambda x: x.split('_')[0])
