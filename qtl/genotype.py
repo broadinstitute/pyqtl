@@ -90,7 +90,10 @@ def get_genotypes_region(vcf, region, field='GT', dosages=True):
     field_ix = s[0].split('\t')[8].split(':').index(field)
 
     if dosages:
-        s = [[gt_dosage_dict[i.split(':', field_ix+1)[field_ix]] for i in si.split('\t')[9:]] for si in s]
+        if field == 'GT':
+            s = [[gt_dosage_dict[i.split(':', field_ix+1)[field_ix]] for i in si.split('\t')[9:]] for si in s]
+        elif field == 'DS':
+            s = [[i.split(':', field_ix+1)[field_ix] for i in si.split('\t')[9:]] for si in s]
         dtype = np.float32
     else:
         s = [[i.split(':', field_ix+1)[field_ix] for i in si.split('\t')[9:]] for si in s]
