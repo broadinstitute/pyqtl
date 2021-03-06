@@ -42,6 +42,39 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
 #     ax.tick_params(axis='both', which='both', direction='out', labelsize=fontsize)
 
 
+def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
+               x_offset=6, y_offset=6,
+               dl=0.5, aw=2, dx=0.75, dr=0.25,
+               db=0.5, ah=2, dy=0.75, dt=0.25,
+               colorbar=False, tri=None):
+    """
+    """
+    if ntot is None:
+        ntot = nr * nc
+
+    fw = dl + nc*aw + (nc-1)*dx + dr
+    fh = db + nr*ah + (nr-1)*dy + dt
+    fig = plt.figure(figsize=(fw,fh), facecolor=(1,1,1))
+    axes = []
+    n = 0
+
+    if tri is None:
+        si = lambda x: 0
+    elif tri == 'upper':
+        si = lambda x: x
+
+    for j in range(nr):
+        for i in range(si(j), nc):
+            if n<ntot:
+                ax = fig.add_axes([(dl+i*(aw+dx))/fw, (db+(nr-j-1)*(ah+dy))/fh, aw/fw, ah/fh],
+                                  sharex=axes[0] if sharex and n>0 else None,
+                                  sharey=axes[0] if sharey and n>0 else None)
+                format_plot(ax, fontsize=10, x_offset=x_offset, y_offset=y_offset)
+                axes.append(ax)
+                n += 1
+    return axes
+
+
 def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
                 hide_spines=True, lw=1, fontsize=10,
                 equal_limits=False, x_offset=0, y_offset=0, vmin=None):
