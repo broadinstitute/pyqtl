@@ -180,7 +180,7 @@ class Gene(object):
                 e.start_pos += offset
                 e.end_pos += offset
 
-    def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight=None,
+    def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight_region=None,
              fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], wx=0.05, reference=None, show_ylabels=True,
              intron_coords=None, highlight_intron=None, clip_on=False, yoffset=0, xlim=None):
         """Visualization"""
@@ -226,6 +226,9 @@ class Gene(object):
         cumul_dist_adj[1::2] = ce_lengths
         cumul_dist_adj = np.cumsum(cumul_dist_adj)
 
+        cumul_dist_diff = cumul_dist - cumul_dist_adj
+        relative_pos = lambda x: x - reference - cumul_dist_diff[np.nonzero(x - self.start_pos >= cumul_dist)[0][-1]]
+
         # plot transcripts; positions are in genomic coordinates
         for (i,t) in enumerate(self.transcripts[::-1], yoffset):
 
@@ -236,12 +239,10 @@ class Gene(object):
             for u in t.utr3:
                 utr[u[0]-t.start_pos:u[1]-t.start_pos+1] = 1
 
-            idx = np.nonzero(t.start_pos - self.start_pos>=cumul_dist)[0][-1]
-            s = t.start_pos - reference - (cumul_dist[idx]-cumul_dist_adj[idx])
-            idx = np.nonzero(t.end_pos - self.start_pos>=cumul_dist)[0][-1]
-            e = t.end_pos - reference - (cumul_dist[idx]-cumul_dist_adj[idx])
             # plot background line
-            y = i-wx/2
+            s = relative_pos(t.start_pos)
+            e = relative_pos(t.end_pos)
+            y = i - wx/2
             patch = patches.Rectangle((s, y), e-s, wx, fc=fc, zorder=9, clip_on=clip_on)
             ax.add_patch(patch)
 
@@ -254,28 +255,33 @@ class Gene(object):
 
                 for ic in intron_coords:
                     if ic in introns:
-                        idx = np.nonzero(ic[0] - self.start_pos>=cumul_dist)[0][-1]
-                        s = ic[0] - reference - (cumul_dist[idx]-cumul_dist_adj[idx])
-                        idx = np.nonzero(ic[1] - self.start_pos>=cumul_dist)[0][-1]
-                        e = ic[1] - reference - (cumul_dist[idx]-cumul_dist_adj[idx])
+                        s = relative_pos(ic[0])
+                        e = relative_pos(ic[1])
                         if ic == highlight_intron:
                             patch = patches.Rectangle((s, i-wx*2), e-s, 4*wx, fc=hsv_to_rgb([0, 0.8, 1]), zorder=19, clip_on=clip_on)
                         else:
                             patch = patches.Rectangle((s, i-wx), e-s, 2*wx, fc=hsv_to_rgb([0.1, 0.8, 1]), zorder=19, clip_on=clip_on)
                         ax.add_patch(patch)
 
+            # plot exons
             for e in t.exons:
-                ev = np.ones(e.end_pos-e.start_pos+1)
-                ev[utr[e.start_pos-t.start_pos:e.end_pos-t.start_pos+1]==1] = 0.5
-                ex = np.arange(e.start_pos-reference, e.end_pos-reference+1)
+                ev = np.ones(e.end_pos-e.start_pos+1)  # height
+                ev[utr[e.start_pos-t.start_pos:e.end_pos-t.start_pos+1]==1] = 0.5  # UTRs
+                ex = np.arange(e.start_pos-reference, e.end_pos-reference+1)  # position
 
                 # adjust for skipped intron positions
-                idx = np.nonzero(e.start_pos-self.start_pos>=cumul_dist)[0][-1]
-                ex -= (cumul_dist[idx]-cumul_dist_adj[idx])
+                ex -= cumul_dist_diff[np.nonzero(e.start_pos - self.start_pos >= cumul_dist)[0][-1]]
 
                 vertices = np.vstack((np.hstack((ex, ex[::-1], ex[0])), i+scale*np.hstack((ev,-ev[::-1], ev[0])))).T
                 patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=fc, ec='none', lw=0, zorder=10, clip_on=clip_on)
                 ax.add_patch(patch)
+
+        if highlight_region is not None:
+            s,e = highlight_region.split(':')[-1].split('-')
+            s = relative_pos(int(s))
+            e = relative_pos(int(e))
+            patch = patches.Rectangle((s, -0.5), e-s, len(self.transcripts), fc=hsv_to_rgb([0, 0.8, 1]), alpha=0.5, zorder=-10, clip_on=clip_on)
+            ax.add_patch(patch)
 
         ax.set_ylim([-0.6, i+0.6])
         if xlim is not None:
