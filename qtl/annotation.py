@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 import os
+import tempfile
+import subprocess
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.path as mpath
@@ -48,6 +50,25 @@ def interval_union(intervals):
     return np.array(union)
 
 
+def get_sequence(fasta, region_str, concat=False):
+    """Get sequence corresponding to region_str (chr:start-end) or list of region_str"""
+    if isinstance(region_str, str):
+        s = subprocess.check_output(f'samtools faidx {fasta} {region_str} -n 1000000000',
+                                    shell=True).decode().strip().split('\n')
+        return s[1]
+    else:  # list of region_str
+        with tempfile.NamedTemporaryFile(mode='w+t') as f:
+            f.write('\n'.join(region_str)+'\n')
+            f.flush()
+            s = subprocess.check_output(f'samtools faidx {fasta} -r {f.name} -n 1000000000',
+                                        shell=True).decode().strip().split('\n')
+        assert [i[1:] for i in s[::2]] == region_str
+        s = s[1::2]
+        if concat:
+            s = ''.join(s)
+        return s
+
+
 def get_coord_transform(gene, max_intron=1000):
     """Interpolation function for exon/intron coordinates"""
 
@@ -63,6 +84,10 @@ def get_coord_transform(gene, max_intron=1000):
     icoords = np.array([[d+0, d+e-1] for e,d in zip(exon_lengths, np.cumsum(np.r_[0, exon_lengths[:-1]+transformed_intron_lengths]))]).reshape(1,-1)[0]
     ifct = interpolate.interp1d(coords, icoords, kind='linear')
     return ifct
+
+
+def reverse_complement(s):
+    return s.translate(str.maketrans('ATCG', 'TAGC'))[::-1]
 
 
 class Exon(object):
@@ -121,6 +146,16 @@ class Transcript(object):
             f'; length: {sum([e.length for e in self.exons]):d}']
         rep += ['    '+i.__str__(ref) for i in self.exons]
         return '\n'.join(rep)
+
+    def load_sequence(self, fasta):
+        """Load transcript sequence from FASTA"""
+        region_strs = [f'{self.gene.chr}:{e.start_pos}-{e.end_pos}' for e in self.exons]
+        if self.gene.strand == '-':
+            region_strs = region_strs[::-1]
+        s = get_sequence(fasta, region_strs, concat=True)
+        if self.gene.strand == '-':
+            s = reverse_complement(s)
+        self.seq = s
 
 
 class Gene(object):
