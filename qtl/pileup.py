@@ -23,9 +23,15 @@ def cd(cd_path):
 
 
 def _samtools_depth_wrapper(args):
+    """
+    Wrapper for `samtools depth`.
+
+    For files on GCP, GCS_OAUTH_TOKEN must be set.
+    This can be done with qtl.refresh_gcs_token().
+    """
     bam_file, region_str, sample_id, bam_index_dir, depth = args
 
-    cmd = f'samtools depth -a -a -d {depth} -Q 255 -r {region_str} {bam_file}'
+    cmd = f'export GCS_OAUTH_TOKEN=$GCS_OAUTH_TOKEN; samtools depth -a -a -d {depth} -Q 255 -r {region_str} {bam_file}'
     if bam_index_dir is not None:
         with cd(bam_index_dir):
             c = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
