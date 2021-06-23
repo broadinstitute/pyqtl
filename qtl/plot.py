@@ -55,7 +55,7 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
 
     fw = dl + nc*aw + (nc-1)*dx + dr
     fh = db + nr*ah + (nr-1)*dy + dt
-    fig = plt.figure(figsize=(fw,fh), facecolor=(1,1,1))
+    fig = plt.figure(figsize=(fw,fh))
     axes = []
     n = 0
 
@@ -67,7 +67,7 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
     for j in range(nr):
         for i in range(si(j), nc):
             if n<ntot:
-                ax = fig.add_axes([(dl+i*(aw+dx))/fw, (db+(nr-j-1)*(ah+dy))/fh, aw/fw, ah/fh],
+                ax = fig.add_axes([(dl+i*(aw+dx))/fw, (db+(nr-j-1)*(ah+dy))/fh, aw/fw, ah/fh], facecolor='none',
                                   sharex=axes[0] if sharex and n>0 else None,
                                   sharey=axes[0] if sharey and n>0 else None)
                 format_plot(ax, fontsize=fontsize, hide=hide, x_offset=x_offset, y_offset=y_offset)
@@ -720,8 +720,8 @@ def hexdensity(x, y, bounds=None, bins='log', scale='log',
     hc.set_label('log$\mathregular{_{10}}$('+entity+')', fontsize=fontsize)
 
     if isinstance(x, pd.Series):
-        ax.set_xlabel(f'{x.name} ({unit})', fontsize=fontsize)
+        ax.set_xlabel(f'{x.name} ({unit})' if unit is not None else f'{x.name}', fontsize=fontsize)
     if isinstance(y, pd.Series):
-        ax.set_ylabel(f'{y.name} ({unit})', fontsize=fontsize)
+        ax.set_ylabel(f'{y.name} ({unit})' if unit is not None else f'{y.name}', fontsize=fontsize)
 
     return ax, cax

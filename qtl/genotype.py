@@ -166,7 +166,7 @@ def get_genotype(variant_id, vcf, field='GT', convert_gt=True, sample_ids=None):
     return s
 
 
-def get_genotypes(variant_ids, vcf, field='GT'):
+def get_genotypes(variant_ids, vcf, field='GT', drop_duplicates=True):
     """"""
 
     variant_id_set = set(variant_ids)
@@ -189,9 +189,9 @@ def get_genotypes(variant_ids, vcf, field='GT'):
         dosages = np.float32([[j.split(':')[ds_ix] for j in i[9:]] for i in s])
     df = pd.DataFrame(dosages, index=variant_ids2, columns=get_sample_ids(vcf))
     df = df[df.index.isin(variant_id_set)]
-    df = df[~df.index.duplicated()]
+    if drop_duplicates:
+        df = df[~df.index.duplicated()]
     return df
-
 
 
 def load_vcf(vcf):
@@ -222,7 +222,8 @@ def load_vcf(vcf):
             variant_ids.append(line[2])
             dosages[k,:] = [gt_dosage_dict[i.split(':')[gt_ix]] for i in line[9:]]
             if np.mod(k,1000)==0:
-                print(f'\rVariants processed: {k}', end='')
+                print(f'\rVariants processed: {k:,}', end='')
+        print(f'\rVariants processed: {k:,}')
 
     return pd.DataFrame(dosages, index=variant_ids, columns=sample_ids)
 
