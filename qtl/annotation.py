@@ -147,6 +147,11 @@ class Transcript(object):
         rep += ['    '+i.__str__(ref) for i in self.exons]
         return '\n'.join(rep)
 
+    def __eq__(self, other):
+        return (self.id == other.id and
+                len(self.exons) == len(other.exons) and
+                np.all([i == j for i,j in zip(self.exons, other.exons)]))
+
     def load_sequence(self, fasta):
         """Load transcript sequence from FASTA"""
         region_strs = [f'{self.gene.chr}:{e.start_pos}-{e.end_pos}' for e in self.exons]
@@ -185,9 +190,13 @@ class Gene(object):
             rep = rep + f'; {len(self.transcripts)} isoforms'
         if isinstance(self.mappability, float):
             rep = rep + f'; Mappability: {self.mappability:.4f}'
-
         rep = [rep] + [i.__str__(ref) for i in self.transcripts]
         return '\n'.join(rep)
+
+    def __eq__(self, other):
+        return (self.id == other.id and
+                len(self.transcripts) == len(other.transcripts) and
+                np.all([i == j for i,j in zip(self.transcripts, other.transcripts)]))
 
     def get_coverage(self, bigwig):
         """Returns coverage for the genomic region spanned by the gene"""
