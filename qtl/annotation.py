@@ -869,7 +869,7 @@ class Annotation(object):
                                              '.', g.strand, '.', e.attributes_string])+'\n')
 
 
-    def write_bed(self, bed_path, attribute='id', overwrite=False):
+    def write_bed(self, bed_path, name='transcript_id', add_attributes=True, overwrite=False):
         """
         BED format: chr, start, end, id/name, score (1000), strand, start, end, ., #exons, sizes, starts
 
@@ -885,21 +885,25 @@ class Annotation(object):
                         start = str(t.start_pos-1)
                         end = str(t.end_pos)
                         exon_lengths = [str(e.length) for e in t.exons]
-                        if g.strand=='+':
-                            exon_starts = [str(e.start_pos-t.exons[0].start_pos) for e in t.exons]
-                        elif g.strand=='-':
+                        if g.strand == '+':
+                            exon_starts = [str(e.start_pos - t.exons[0].start_pos) for e in t.exons]
+                        elif g.strand == '-':
                             exon_lengths = exon_lengths[::-1]
-                            exon_starts = [str(e.start_pos-t.exons[-1].start_pos) for e in t.exons[::-1]]
+                            exon_starts = [str(e.start_pos - t.exons[-1].start_pos) for e in t.exons[::-1]]
 
-                        if attribute=='id':
+                        if name == 'transcript_id':
                             tid = [t.id, t.name]
-                        elif attribute=='name':
+                        elif name == 'transcript_name':
                             tid = [t.name, t.id]
+                        elif name == 'gene_id':
+                            tid = [g.id, g.name]
+                        elif name == 'gene_name':
+                            tid = [g.name, g.id]
                         s = [g.chr, start, end, tid[0], '1000', g.strand, start, end, '.',
                             str(len(t.exons)),
                             ','.join(exon_lengths)+',',
                             ','.join(exon_starts)+',',
-                            tid[1]]
-                            # t.__dict__[attribute]]
-
+                        ]
+                        if add_attributes:
+                            s += [tid[1]]
                         bed.write('\t'.join(s)+'\n')
