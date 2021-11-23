@@ -11,5 +11,6 @@ def check_dependency(name):
 
 def refresh_gcs_token():
     """"""
-    t = subprocess.check_output('gcloud auth application-default print-access-token', shell=True)
+    t = subprocess.check_output('gcloud auth application-default print-access-token',
+                                shell=True).decode().strip()
     os.environ.putenv('GCS_OAUTH_TOKEN', t)

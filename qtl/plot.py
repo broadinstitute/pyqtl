@@ -179,7 +179,7 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             i = eqtl_df.columns[2]
             sns.violinplot(x="genotype", y="phenotype", hue=i, hue_order=sorted(eqtl_df[i].unique()),
                            data=eqtl_df, palette=pal, ax=ax, order=[0,1,2], scale='width', dogde=False, linewidth=1, width=0.75)
-            l = ax.legend(loc=loc, fontsize=8, handletextpad=0.5, labelspacing=0.33)
+            l = ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1), fontsize=8, handlelength=0.6, ncol=2, handletextpad=0.5, labelspacing=0.33)
             l.set_title(None)
         else:
             colors = [
@@ -487,7 +487,7 @@ def _qq_scatter(ax, pval, ntests=None, label=None, c=None, zorder=None,
 
 
 def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=100000, step=1000, is_sorted=False,
-           title='', labels=None, fontsize=14, ax=None):
+           title='', labels=None, fontsize=12, ax=None, equal_axes=False):
     """QQ-plot
 
       ntests: total number of tests if not equal to len(pval),
@@ -521,8 +521,13 @@ def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=10000
 
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
-    ax.set_xlim([0, xlim[1]])
-    ax.set_ylim([0, ylim[1]])
+    if equal_axes:
+        m = np.maximum(xlim[1], ylim[1])
+        ax.set_xlim([0, m])
+        ax.set_ylim([0, m])
+    else:
+        ax.set_xlim([0, xlim[1]])
+        ax.set_ylim([0, ylim[1]])
 
     # plot confidence interval
     ci = 0.95

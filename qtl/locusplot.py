@@ -187,12 +187,11 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
     return ax
 
 
-def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_rsid=True,
-               highlight_ids=None, credible_sets=None,
-               tracks=None, track_colors=None,
-               shared_only=True,
+def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
+               highlight_ids=None, credible_sets=None, show_lead=True, show_rsid=True,
+               tracks=None, track_colors=None, shared_only=True,
                xlim=None, ymax=None, sharey=None, labels=None, title=None, shade_range=None,
-               gene_label_pos='right', chr_label_pos='bottom', window=200000, colorbar=True,
+               label_pos='left', gene_label_pos=None, chr_label_pos='bottom', window=200000, colorbar=True,
                dl=0.75, aw=4, dr=0.75, db=0.5, ah=1.25, dt=0.25, ds=0.05, gh=0.2, th=1.5,
                single_ylabel=False, ylabel='-log$\mathregular{_{10}}$(p-value)', rasterized=False):
     """
@@ -220,7 +219,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
     elif isinstance(variant_ids, str):
         variant_ids = [variant_ids]*n
 
-    chrom, pos = variant_ids[0].split('_')[:2]
+    chrom, pos = pvals[0].loc[variant_ids[0], ['chr', 'position']]
     pos = int(pos)
 
     # set up figure
@@ -291,9 +290,12 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
             if r2_s is not None:
                 s = r2_s[window_df.index].sort_values().index
                 r2 = r2_s[s].replace(np.NaN, -1)
-            else:
-                s = pval_df.loc[window_df.index, 'r2'].sort_values().index
+            elif 'r2' in pval_df:
+                s = pval_df.loc[window_df.index, 'r2'].sort_values(na_position='first').index
                 r2 = pval_df.loc[s, 'r2'].replace(np.NaN, -1)
+            else:
+                s = window_df.index
+                r2 = pd.Series(-1, index=s)
             ax.scatter(x[s], p[s], c=r2, s=20, cmap=cmap, norm=norm, edgecolor='k', lw=0.25, rasterized=rasterized)
 
         elif 'pip' in pval_df:
@@ -330,30 +332,32 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
                 else:
                     ax.scatter(x[ix], p[ix], c='goldenrod', **highlight_args)
 
-        # plot selected variant, add text label, etc.
-        minpos = int(variant_id.split('_')[1])
-        if 'pip' not in pval_df:
-            ax.scatter(minpos, minp, **select_args)
-        else:
-            # ax.scatter(minpos, minp, **select_args)
-            ax.scatter(minpos, minp, c=pip_df.loc[variant_id, 'cs_id'], cmap=cs_cmap, norm=cs_norm,
-                      s=24, marker='D', ec='k', lw=0.25)
-
-        if rs_id is not None:
-            if isinstance(rs_id, str):
-                t = rs_id
+        # plot lead/selected variant, add text label, etc.
+        if show_lead:
+            # minpos = int(variant_id.split('_')[1])
+            minpos = pval_df.loc[variant_id, 'position']
+            if 'pip' not in pval_df:
+                ax.scatter(minpos, minp, **select_args)
             else:
-                t = rs_id[k]
-        else:
-            t = variant_id
+                # ax.scatter(minpos, minp, **select_args)
+                ax.scatter(minpos, minp, c=pip_df.loc[variant_id, 'cs_id'], cmap=cs_cmap, norm=cs_norm,
+                          s=24, marker='D', ec='k', lw=0.25)
 
-        if show_rsid:  # text label
-            if (minpos-xlim[0])/(xlim[1]-xlim[0]) < 0.55:  # right
-                txt = ax.annotate(t, (minpos, minp), xytext=(5,5), textcoords='offset points')
+            if rs_id is not None:
+                if isinstance(rs_id, str):
+                    t = rs_id
+                else:
+                    t = rs_id[k]
             else:
-                txt = ax.annotate(t, (minpos, minp), xytext=(-5,5), ha='right', textcoords='offset points')
-        # if minp < -np.log10(pval_df['pval_nominal'].min())*0.8:
-            txt.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
+                t = variant_id
+
+            if show_rsid:  # text label
+                if (minpos-xlim[0])/(xlim[1]-xlim[0]) < 0.55:  # right
+                    txt = ax.annotate(t, (minpos, minp), xytext=(5,5), textcoords='offset points')
+                else:
+                    txt = ax.annotate(t, (minpos, minp), xytext=(-5,5), ha='right', textcoords='offset points')
+            # if minp < -np.log10(pval_df['pval_nominal'].min())*0.8:
+                txt.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
 
     for k,ax in enumerate(axes):
         ax.margins(y=0.2)
@@ -365,8 +369,12 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
             ax.add_patch(patches.Rectangle((shade_range[0], 0), np.diff(shade_range), ax.get_ylim()[1], facecolor=[0.66]*3, zorder=-10))
 
     if labels is not None:
-        for ax,t in zip(axes, labels):
-            ax.text(0.02, 0.925, t, transform=ax.transAxes, va='top', ha='left', fontsize=12)
+        if label_pos == 'left':
+            for ax,t in zip(axes, labels):
+                ax.text(0.02, 0.925, t, transform=ax.transAxes, va='top', ha='left', fontsize=12)
+        elif label_pos == 'right':
+            for ax,t in zip(axes, labels):
+                ax.text(0.98, 0.925, t, transform=ax.transAxes, va='top', ha='right', fontsize=12)
 
     if single_ylabel:
         # for ax in axes:
@@ -434,7 +442,10 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
         axes[-1].tick_params(axis='x', pad=2)
         axes[-1].xaxis.labelpad = 8
         axes[-1].set_xlabel(f'Position on {chrom} (Mb)', fontsize=14)
-        axes[-1].set_xticklabels(axes[-1].get_xticks()/1e6)
+        xt = axes[-1].get_xticks()
+        axes[-1].set_xticks(xt)
+        axes[-1].set_xticklabels(xt/1e6)
+        axes[-1].set_xlim(xlim)
     else:   # add gene model
         #  plot gene model and annotate
         if gene[0].end_pos < xlim[0]:
@@ -459,12 +470,17 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
                 y = len(gene)-1-k
                 # y = k
                 # print(xlim)
-                g.plot(ax=gax, yoffset=k, max_intron=1e9, fc='k', ec='none', reference=1, scale=0.33, show_ylabels=False, clip_on=True)
-                # if gene_label_pos=='right':
-                if gene[k].end_pos - m > m - gene[k].start_pos:
-                    gax.annotate(gene[k].name, (np.minimum(gene[k].end_pos, xlim[1]), y), xytext=(5,0), textcoords='offset points', va='center', ha='left')
-                else:
+                g.plot(ax=gax, yoffset=k, max_intron=1e9, fc='k', ec='none', reference=1, wx=0.1, scale=0.33, show_ylabels=False, clip_on=True)
+                if gene_label_pos is None:
+                    if gene[k].tss - m > m - gene[k].tss:
+                        gax.annotate(gene[k].name, (np.minimum(gene[k].end_pos, xlim[1]), y), xytext=(5,0), textcoords='offset points', va='center', ha='left')
+                    else:
+                        gax.annotate(gene[k].name, (np.maximum(gene[k].start_pos, xlim[0]), y), xytext=(-5,0), textcoords='offset points', va='center', ha='right')
+                elif gene_label_pos == 'left':
                     gax.annotate(gene[k].name, (np.maximum(gene[k].start_pos, xlim[0]), y), xytext=(-5,0), textcoords='offset points', va='center', ha='right')
+                elif gene_label_pos == 'right':
+                    gax.annotate(gene[k].name, (np.minimum(gene[k].end_pos, xlim[1]), y), xytext=(5,0), textcoords='offset points', va='center', ha='left')
+
 
         if chr_label_pos=='bottom':
             gax.set_xlabel(f'Position on {chrom} (Mb)', fontsize=14)
@@ -481,7 +497,10 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None, show_r
         gax.spines['left'].set_visible(False)
         gax.spines['right'].set_visible(False)
         gax.set_title('')
-        gax.set_xticklabels(gax.get_xticks()/1e6);
+        xt = gax.get_xticks()
+        gax.set_xticks(xt)
+        gax.set_xticklabels(xt/1e6)
+        gax.set_xlim(xlim)
         axes.append(gax)
 
     if chr_label_pos!='bottom':

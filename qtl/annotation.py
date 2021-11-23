@@ -226,7 +226,8 @@ class Gene(object):
 
     def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight_region=None,
              fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], wx=0.05, reference=None, show_ylabels=True,
-             intron_coords=None, highlight_intron=None, clip_on=False, yoffset=0, xlim=None):
+             intron_coords=None, highlight_intron=None, clip_on=False, yoffset=0, xlim=None,
+             exclude=[]):
         """Visualization"""
 
         max_intron = int(max_intron)
@@ -274,51 +275,52 @@ class Gene(object):
         relative_pos = lambda x: x - reference - cumul_dist_diff[np.nonzero(x - self.start_pos >= cumul_dist)[0][-1]]
 
         # plot transcripts; positions are in genomic coordinates
-        for (i,t) in enumerate(self.transcripts[::-1], yoffset):
+        for i,t in enumerate(self.transcripts[::-1], yoffset):
+            if t.type not in exclude:
 
-            # UTR mask
-            utr = np.zeros(t.end_pos-t.start_pos+1)
-            for u in t.utr5:
-                utr[u[0]-t.start_pos:u[1]-t.start_pos+1] = 1
-            for u in t.utr3:
-                utr[u[0]-t.start_pos:u[1]-t.start_pos+1] = 1
+                # UTR mask
+                utr = np.zeros(t.end_pos-t.start_pos+1)
+                for u in t.utr5:
+                    utr[u[0]-t.start_pos:u[1]-t.start_pos+1] = 1
+                for u in t.utr3:
+                    utr[u[0]-t.start_pos:u[1]-t.start_pos+1] = 1
 
-            # plot background line
-            s = relative_pos(t.start_pos)
-            e = relative_pos(t.end_pos)
-            y = i - wx/2
-            patch = patches.Rectangle((s, y), e-s, wx, fc=fc, zorder=9, clip_on=clip_on)
-            ax.add_patch(patch)
-
-            # plot highlighted introns
-            if intron_coords is not None:
-                if self.strand == '+':
-                    introns = [[t.exons[i].end_pos, t.exons[i+1].start_pos] for i in range(len(t.exons)-1)]
-                else:
-                    introns = [[t.exons[i+1].end_pos, t.exons[i].start_pos] for i in range(len(t.exons)-1)]
-
-                for ic in intron_coords:
-                    if ic in introns:
-                        s = relative_pos(ic[0])
-                        e = relative_pos(ic[1])
-                        if ic == highlight_intron:
-                            patch = patches.Rectangle((s, i-wx*2), e-s, 4*wx, fc=hsv_to_rgb([0, 0.8, 1]), zorder=19, clip_on=clip_on)
-                        else:
-                            patch = patches.Rectangle((s, i-wx), e-s, 2*wx, fc=hsv_to_rgb([0.1, 0.8, 1]), zorder=19, clip_on=clip_on)
-                        ax.add_patch(patch)
-
-            # plot exons
-            for e in t.exons:
-                ev = np.ones(e.end_pos-e.start_pos+1)  # height
-                ev[utr[e.start_pos-t.start_pos:e.end_pos-t.start_pos+1]==1] = 0.5  # UTRs
-                ex = np.arange(e.start_pos-reference, e.end_pos-reference+1)  # position
-
-                # adjust for skipped intron positions
-                ex -= cumul_dist_diff[np.nonzero(e.start_pos - self.start_pos >= cumul_dist)[0][-1]]
-
-                vertices = np.vstack((np.hstack((ex, ex[::-1], ex[0])), i+scale*np.hstack((ev,-ev[::-1], ev[0])))).T
-                patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=fc, ec='none', lw=0, zorder=10, clip_on=clip_on)
+                # plot background line
+                s = relative_pos(t.start_pos)
+                e = relative_pos(t.end_pos)
+                y = i - wx/2
+                patch = patches.Rectangle((s, y), e-s, wx, fc=fc, zorder=9, clip_on=clip_on)
                 ax.add_patch(patch)
+
+                # plot highlighted introns
+                if intron_coords is not None:
+                    if self.strand == '+':
+                        introns = [[t.exons[i].end_pos, t.exons[i+1].start_pos] for i in range(len(t.exons)-1)]
+                    else:
+                        introns = [[t.exons[i+1].end_pos, t.exons[i].start_pos] for i in range(len(t.exons)-1)]
+
+                    for ic in intron_coords:
+                        if ic in introns:
+                            s = relative_pos(ic[0])
+                            e = relative_pos(ic[1])
+                            if ic == highlight_intron:
+                                patch = patches.Rectangle((s, i-wx*2), e-s, 4*wx, fc=hsv_to_rgb([0, 0.8, 1]), zorder=19, clip_on=clip_on)
+                            else:
+                                patch = patches.Rectangle((s, i-wx), e-s, 2*wx, fc=hsv_to_rgb([0.1, 0.8, 1]), zorder=19, clip_on=clip_on)
+                            ax.add_patch(patch)
+
+                # plot exons
+                for e in t.exons:
+                    ev = np.ones(e.end_pos-e.start_pos+1)  # height
+                    ev[utr[e.start_pos-t.start_pos:e.end_pos-t.start_pos+1]==1] = 0.5  # UTRs
+                    ex = np.arange(e.start_pos-reference, e.end_pos-reference+1)  # position
+
+                    # adjust for skipped intron positions
+                    ex -= cumul_dist_diff[np.nonzero(e.start_pos - self.start_pos >= cumul_dist)[0][-1]]
+
+                    vertices = np.vstack((np.hstack((ex, ex[::-1], ex[0])), i+scale*np.hstack((ev,-ev[::-1], ev[0])))).T
+                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=fc, ec='none', lw=0, zorder=10, clip_on=clip_on)
+                    ax.add_patch(patch)
 
         if highlight_region is not None:
             s,e = highlight_region.split(':')[-1].split('-')
