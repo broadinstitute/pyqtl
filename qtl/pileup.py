@@ -6,6 +6,8 @@ import subprocess
 import contextlib
 import multiprocessing as mp
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.colors import hsv_to_rgb
 import seaborn as sns
 from cycler import cycler
 
@@ -99,7 +101,8 @@ def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=No
 
 
 def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive',
-         title=None, label_pos=None, show_variant_pos=False, max_intron=300, alpha=1, lw=0.5, intron_coords=None, highlight_intron=None,
+         title=None, label_pos=None, show_variant_pos=False, max_intron=300, alpha=1, lw=0.5,
+         intron_coords=None, highlight_intron=None, shade_range=None,
          ymax=None, rasterized=False, outline=False, labels=None,
          dl=0.75, aw=4.5, dr=0.5, db=0.5, ah=1.5, dt=0.25, ds=0.4):
     """
@@ -120,9 +123,9 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         fh += da2
 
     custom_cycler = cycler('color', [
-        sns.color_palette("husl", 8)[5], # blue
-        sns.color_palette("Paired")[7],  # orange
-        sns.color_palette("Paired")[3],  # green
+        hsv_to_rgb([0.55, 0.75, 0.8]),  #(0.2, 0.65, 0.8),  # blue
+        hsv_to_rgb([0.08, 1, 1]),  #(1.0, 0.5, 0.0),   # orange
+        hsv_to_rgb([0.3, 0.7, 0.7]),  #(0.2, 0.6, 0.17),  # green
     ])
 
     x = np.arange(pileup_dfs[0].shape[0])
@@ -150,8 +153,6 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     else:
         pos = None
         gtlabels = None
-        # gtlabels = ['Low', 'Medium', 'High']
-        # gtlabels = pileup_dfs[0].columns
 
     s = pileup_dfs[0].sum()
     if isinstance(order, list):
@@ -196,7 +197,6 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         ax.set_xticks(xinterp)
         ax.set_xticklabels([])
         ax.spines['left'].set_position(('outward', 6))
-    axv[0].set_xlabel(f'Exon coordinates on {gene.chr}', fontsize=12)
 
     if gtlabels is None:
         leg = axv[-1].legend(loc='lower left', labelspacing=0.15, frameon=False, fontsize=9, borderaxespad=0.5,
@@ -208,9 +208,9 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         line.set_linewidth(1)
 
     if variant_id is not None and title is None:
-        axv[-1].set_title(f'{variant_id} :: {gene.name}', fontsize=10)
+        axv[-1].set_title(f'{gene.name} :: {variant_id}', fontsize=11)
     else:
-        axv[-1].set_title(title, fontsize=10)
+        axv[-1].set_title(title, fontsize=11)
 
     if label_pos is not None:  # drop this now that introns are highlighted in gene model?
         for i in label_pos:
@@ -218,31 +218,38 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
             axv[0].get_xticklabels()[j].set_color("red")
 
     # highlight variant
-    if show_variant_pos and pos is not None and pos>=gene.start_pos and pos<=gene.end_pos:
+    if show_variant_pos and pos is not None and pos >= gene.start_pos and pos <= gene.end_pos:
         x = ifct(pos-gene.start_pos)
         for ax in axv:
-            xlim = np.diff(ax.get_xlim())
-            ylim = np.diff(ax.get_ylim())
-            h = 0.02 * ylim
+            xlim = np.diff(ax.get_xlim())[0]
+            ylim = np.diff(ax.get_ylim())[0]
+            h = 0.04 * ylim
             b = h/np.sqrt(3) * ah/aw * xlim/ylim
-            v = np.array([[x-b,-h-0.01*ylim], [x+b,-h-0.01*ylim], [x,-0.01*ylim]])
-            polygon = patches.Polygon(v, True, color='r', clip_on=False, zorder=10)
-            ax.add_patch(polygon)
+            v = np.array([[x-b, -h-0.01*ylim], [x+b, -h-0.01*ylim], [x, -0.01*ylim]])
+            ax.add_patch(patches.Polygon(v, closed=True, color='r', clip_on=False, zorder=10))
+
+    if shade_range is not None:
+        if isinstance(shade_range, str):
+            shade_range = shade_range.split(':')[-1].split('-')
+        shade_range = np.array(shade_range).astype(int)
+        shade_range -= gene.start_pos
+
+        shade_range = ifct(shade_range)
+        for k in range(len(shade_range)-1):
+            axv[-1].add_patch(patches.Rectangle((shade_range[k], 0), shade_range[k+1]-shade_range[k], ax.get_ylim()[1],
+                              facecolor=[0.8]*3 if k % 2 == 0 else [0.9]*3, zorder=-10))
 
     # add gene model
     gax = fig.add_axes([dl/fw, db/fh, aw/fw, da/fh], sharex=axv[0])
     gene.plot(ax=gax, max_intron=max_intron, intron_coords=intron_coords, wx=0.1,
               highlight_intron=highlight_intron, fc='k', ec='none', clip_on=True)
-    # gax.set_xticks(ax.get_xticks())
     gax.set_title('')
     gax.set_ylabel('Isoforms', fontsize=10, rotation=0, ha='right', va='center')
     plt.setp(gax.get_xticklabels(), visible=False)
     plt.setp(gax.get_yticklabels(), visible=False)
     for s in ['top', 'right', 'bottom', 'left']:
         gax.spines[s].set_visible(False)
-    for line in gax.xaxis.get_ticklines() + gax.yaxis.get_ticklines():
-        line.set_markersize(0)
-        line.set_markeredgewidth(0)
+    gax.tick_params(length=0, labelbottom=False)
     axv.append(gax)
 
     if mappability_bigwig is not None:  # add mappability
@@ -256,5 +263,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         mpax.tick_params(length=0, labelbottom=False)
         axv.append(mpax)
         plt.sca(axv[0])
+
+    axv[-1].set_xlabel(f'Exon coordinates on {gene.chr}', fontsize=12)
 
     return axv
