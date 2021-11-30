@@ -9,6 +9,7 @@ from matplotlib.colors import hsv_to_rgb
 import seaborn as sns
 import scipy.cluster.hierarchy as hierarchy
 from cycler import cycler
+from collections import Iterable
 import copy
 
 from . import stats
@@ -46,7 +47,7 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
                x_offset=6, y_offset=6,
                dl=0.5, aw=2, dx=0.75, dr=0.25,
                db=0.5, ah=2, dy=0.75, dt=0.25,
-               colorbar=False, ds=0.15, cw=0.15, ct=0, ch=None,
+               colorbar=None, ds=0.15, cw=0.15, ct=0, ch=None,
                tri=None, fontsize=10, hide=['top', 'right']):
     """
     """
@@ -74,11 +75,19 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
                 axes.append(ax)
                 n += 1
 
-    if not colorbar:
+    if ch is None:
+        ch = ah/2
+    if colorbar is None:
         return axes
-    else:
-        if ch is None:
-            ch = ah/2
+    elif isinstance(colorbar, Iterable):
+        cax = []
+        for k in colorbar:
+            i = k // nc  # row
+            j = k - i*nc  # col
+            cax.append(fig.add_axes([(dl+(j+1)*aw+j*dx+ds)/fw, (db+(nr-i)*ah+(nr-i-1)*dy-ch-ct)/fh, cw/fw, ch/fh]))
+        return axes, cax
+
+    elif colorbar == True:
         cax = fig.add_axes([(dl+nc*aw+(nc-1)*dx+ds)/fw, (db+nr*ah+(nr-1)*dy-ch-ct)/fh, cw/fw, ch/fh])
         # cax = fig.add_axes([(dl+aw+ds)/fw, (db+ah-ch-ct)/fh, cw/fw, ch/fh])
         return axes, cax
