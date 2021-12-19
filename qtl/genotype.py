@@ -37,11 +37,11 @@ class GenotypeIndexer(object):
     def get_genotypes(self, variant_ids):
         return self.genotype_df.values[[self.index_dict[i] for i in variant_ids]][:, self.sample_ix]
 
-    def get_genotype_window(self, variant_id, window=200000):
-        chrom, pos = variant_id.split('_')[:2]
-        pos = int(pos)
-        lb = np.searchsorted(self.chr_variant_dfs[chrom]['pos'].values, pos - window)
-        ub = np.searchsorted(self.chr_variant_dfs[chrom]['pos'].values, pos + window, side='right')
+    def get_genotype_window(self, region_str):
+        chrom, pos = region_str.split(':')
+        start, end = pos.split('-')
+        lb = np.searchsorted(self.chr_variant_dfs[chrom]['pos'].values, int(start))
+        ub = np.searchsorted(self.chr_variant_dfs[chrom]['pos'].values, int(end), side='right')
         ub = np.minimum(ub, self.chr_variant_dfs[chrom].shape[0]-1)
         lb = self.chr_variant_dfs[chrom]['index'][lb]
         ub = self.chr_variant_dfs[chrom]['index'][ub]
@@ -140,20 +140,21 @@ def get_genotype(variant_id, vcf, field='GT', convert_gt=True, sample_ids=None):
     if '\n' in s:
         s = s.split('\n')
         try:
-            s = s[np.nonzero(np.array([i.split('\t',3)[-2] for i in s])==variant_id)[0][0]]
+            s = s[np.nonzero(np.array([i.split('\t',3)[-2] for i in s]) == variant_id)[0][0]]
         except:
             raise ValueError("Variant ID not found in VCF.")
     s = s.split('\t')
     fmt = s[8].split(':')
 
-    if field=='DS':
+    if field == 'DS':
         if 'DS' in fmt:
-            s = np.array([np.float32(i.rsplit(':', 1)[-1]) for i in s[9:]])  # dosages
+            ds_ix = fmt.index('DS')
+            s = np.array([np.float32(i.split(':')[ds_ix]) for i in s[9:]])  # dosages
         else:
             raise ValueError('No dosage (DS) values found in VCF.')
     # check format: use GT if DS not present
     else:
-        assert fmt[0]=='GT'
+        assert fmt[0] == 'GT'
         s = [i.split(':', 1)[0] for i in s[9:]]
 
         if convert_gt:
