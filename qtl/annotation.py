@@ -225,10 +225,12 @@ class Gene(object):
                 e.end_pos += offset
 
     def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight_region=None,
-             fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], wx=0.05, reference=None, show_ylabels=True,
+             fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], wx=0.05, reference=None, ylabels='id',
              intron_coords=None, highlight_intron=None, clip_on=False, yoffset=0, xlim=None,
-             exclude=[]):
+             highlight_transcripts=None, exclude_biotypes=[]):
         """Visualization"""
+
+        transcripts = [t for t in self.transcripts if t.type not in exclude_biotypes]
 
         max_intron = int(max_intron)
         if reference is None:
@@ -238,7 +240,7 @@ class Gene(object):
         if ax is None:
             axes_input = False
 
-            ah = len(self.transcripts) * 0.275
+            ah = len(transcripts) * 0.275
             aw = 7
             db = 0.3
             dt = 0.3
@@ -275,58 +277,62 @@ class Gene(object):
         relative_pos = lambda x: x - reference - cumul_dist_diff[np.nonzero(x - self.start_pos >= cumul_dist)[0][-1]]
 
         # plot transcripts; positions are in genomic coordinates
-        for i,t in enumerate(self.transcripts[::-1], yoffset):
-            if t.type not in exclude:
+        for i,t in enumerate(transcripts[::-1], yoffset):
+            # UTR mask
+            utr = np.zeros(t.end_pos-t.start_pos+1)
+            for u in t.utr5:
+                utr[u[0]-t.start_pos:u[1]-t.start_pos+1] = 1
+            for u in t.utr3:
+                utr[u[0]-t.start_pos:u[1]-t.start_pos+1] = 1
 
-                # UTR mask
-                utr = np.zeros(t.end_pos-t.start_pos+1)
-                for u in t.utr5:
-                    utr[u[0]-t.start_pos:u[1]-t.start_pos+1] = 1
-                for u in t.utr3:
-                    utr[u[0]-t.start_pos:u[1]-t.start_pos+1] = 1
-
-                # plot background line
-                s = relative_pos(t.start_pos)
-                e = relative_pos(t.end_pos)
-                y = i - wx/2
+            # plot background line
+            s = relative_pos(t.start_pos)
+            e = relative_pos(t.end_pos)
+            y = i - wx/2
+            if highlight_transcripts is not None and t.id == highlight_transcripts:
+                patch = patches.Rectangle((s, y), e-s, wx, fc='k', zorder=9, clip_on=clip_on)
+            else:
                 patch = patches.Rectangle((s, y), e-s, wx, fc=fc, zorder=9, clip_on=clip_on)
-                ax.add_patch(patch)
+            ax.add_patch(patch)
 
-                # plot highlighted introns
-                if intron_coords is not None:
-                    if self.strand == '+':
-                        introns = [[t.exons[i].end_pos, t.exons[i+1].start_pos] for i in range(len(t.exons)-1)]
-                    else:
-                        introns = [[t.exons[i+1].end_pos, t.exons[i].start_pos] for i in range(len(t.exons)-1)]
+            # plot highlighted introns
+            if intron_coords is not None:
+                if self.strand == '+':
+                    introns = [[t.exons[i].end_pos, t.exons[i+1].start_pos] for i in range(len(t.exons)-1)]
+                else:
+                    introns = [[t.exons[i+1].end_pos, t.exons[i].start_pos] for i in range(len(t.exons)-1)]
 
-                    for ic in intron_coords:
-                        if ic in introns:
-                            s = relative_pos(ic[0])
-                            e = relative_pos(ic[1])
-                            if ic == highlight_intron:
-                                patch = patches.Rectangle((s, i-wx*2), e-s, 4*wx, fc=hsv_to_rgb([0, 0.8, 1]), zorder=19, clip_on=clip_on)
-                            else:
-                                patch = patches.Rectangle((s, i-wx), e-s, 2*wx, fc=hsv_to_rgb([0.1, 0.8, 1]), zorder=19, clip_on=clip_on)
-                            ax.add_patch(patch)
+                for ic in intron_coords:
+                    if ic in introns:
+                        s = relative_pos(ic[0])
+                        e = relative_pos(ic[1])
+                        if ic == highlight_intron:
+                            patch = patches.Rectangle((s, i-wx*2), e-s, 4*wx, fc=hsv_to_rgb([0, 0.8, 1]), zorder=19, clip_on=clip_on)
+                        else:
+                            patch = patches.Rectangle((s, i-wx), e-s, 2*wx, fc=hsv_to_rgb([0.1, 0.8, 1]), zorder=19, clip_on=clip_on)
+                        ax.add_patch(patch)
 
-                # plot exons
-                for e in t.exons:
-                    ev = np.ones(e.end_pos-e.start_pos+1)  # height
-                    ev[utr[e.start_pos-t.start_pos:e.end_pos-t.start_pos+1]==1] = 0.5  # UTRs
-                    ex = np.arange(e.start_pos-reference, e.end_pos-reference+1)  # position
+            # plot exons
+            for e in t.exons:
+                ev = np.ones(e.end_pos-e.start_pos+1)  # height
+                ev[utr[e.start_pos-t.start_pos:e.end_pos-t.start_pos+1] == 1] = 0.5  # UTRs
+                ex = np.arange(e.start_pos-reference, e.end_pos-reference+1)  # position
 
-                    # adjust for skipped intron positions
-                    ex -= cumul_dist_diff[np.nonzero(e.start_pos - self.start_pos >= cumul_dist)[0][-1]]
+                # adjust for skipped intron positions
+                ex -= cumul_dist_diff[np.nonzero(e.start_pos - self.start_pos >= cumul_dist)[0][-1]]
 
-                    vertices = np.vstack((np.hstack((ex, ex[::-1], ex[0])), i+scale*np.hstack((ev,-ev[::-1], ev[0])))).T
+                vertices = np.vstack((np.hstack((ex, ex[::-1], ex[0])), i+scale*np.hstack((ev,-ev[::-1], ev[0])))).T
+                if highlight_transcripts is not None and t.id == highlight_transcripts:
+                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc='k', ec='none', lw=0, zorder=10, clip_on=clip_on)
+                else:
                     patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=fc, ec='none', lw=0, zorder=10, clip_on=clip_on)
-                    ax.add_patch(patch)
+                ax.add_patch(patch)
 
         if highlight_region is not None:
             s,e = highlight_region.split(':')[-1].split('-')
             s = relative_pos(int(s))
             e = relative_pos(int(e))
-            patch = patches.Rectangle((s, -0.5), e-s, len(self.transcripts), fc=hsv_to_rgb([0, 0.8, 1]), alpha=0.5, zorder=-10, clip_on=clip_on)
+            patch = patches.Rectangle((s, -0.5), e-s, len(transcripts), fc=hsv_to_rgb([0, 0.8, 1]), alpha=0.5, zorder=-10, clip_on=clip_on)
             ax.add_patch(patch)
 
         ax.set_ylim([-0.6, i+0.6])
@@ -334,14 +340,14 @@ class Gene(object):
             ax.set_xlim(xlim)
         else:
             xlim = ax.get_xlim()
-            if xlim[0]==0 and xlim[1]==1:
+            if xlim[0] == 0 and xlim[1] == 1:
                 xlim = np.array([0, cumul_dist_adj[-1]-1]) + self.start_pos - reference
                 if not axes_input:
                     xlim = [xlim[0]-150, xlim[1]+150]
                 ax.set_xlim(xlim)
-        if show_ylabels:
-            ax.set_yticks(range(len(self.transcripts)))#, ha='right')
-            ax.set_yticklabels([t.id for t in self.transcripts[::-1]], fontsize=9)
+        if ylabels is not None:
+            ax.set_yticks(range(len(transcripts)))
+            ax.set_yticklabels([getattr(t, ylabels) for t in transcripts[::-1]], fontsize=9)
 
         if not axes_input:
             ax.set_xticks([0, cumul_dist_adj[-1]])
@@ -349,8 +355,8 @@ class Gene(object):
             # add transcript type label
             ax2 = ax.twinx()
             ax2.set_ylim([-0.6, i+0.6])
-            ax2.set_yticks(range(len(self.transcripts)))
-            ax2.set_yticklabels([t.type.replace('_', ' ').capitalize() for t in self.transcripts[::-1]], ha='left', fontsize=9)
+            ax2.set_yticks(range(len(transcripts)))
+            ax2.set_yticklabels([t.type.replace('_', ' ').capitalize() for t in transcripts[::-1]], ha='left', fontsize=9)
             format_plot(ax2, tick_length=4, hide=['top', 'left', 'right'])
             format_plot(ax, tick_length=4, hide=['top', 'left', 'right'])
 
@@ -369,7 +375,7 @@ class Gene(object):
             pidx = pidx-pidx[0]
 
             ac.set_title(self.name + ' (' + self.id + ')', fontsize=12)
-            if len(coverage.shape)==1:
+            if len(coverage.shape) == 1:
                 ac.fill_between(np.arange(len(pidx)), coverage[pidx], edgecolor='none', facecolor=3*[0.66])
             else:
                 ac.plot(np.arange(len(pidx)), coverage[pidx])
@@ -379,7 +385,10 @@ class Gene(object):
             ac.set_xticks([])
             format_plot(ac, tick_length=4, hide=['top', 'right'])
         elif not axes_input:
-            ax.set_title(self.name + ' (' + self.id + ')', fontsize=12)
+            ax.set_title(f"{self.name} ({self.id})", fontsize=12)
+            ax.set_xlabel(self.chr, fontsize=12)
+
+        return ax
 
 
 def get_attributes(attr_str):
@@ -433,7 +442,7 @@ class Annotation(object):
 
             with opener as gtf:
                 for row in gtf:
-                    if row[0]=='#':
+                    if row[0] == '#':
                         self.header.append(row.strip())
                         continue
 
@@ -449,7 +458,7 @@ class Annotation(object):
 
                     attributes = get_attributes(row[8])
 
-                    if annot_type=='gene':
+                    if annot_type == 'gene':
                         gene_id = attributes['gene_id']
                         g = Gene(gene_id, attributes['gene_name'], attributes['gene_type'], chrom, strand, start_pos, end_pos)
                         g.source = row[1]
@@ -462,7 +471,7 @@ class Annotation(object):
                         self.gene_names.append(attributes['gene_name'])
                         self.genes.append(g)
 
-                    elif annot_type=='transcript':
+                    elif annot_type == 'transcript':
                         transcript_id = attributes['transcript_id']
                         if 'transcript_name' not in attributes:
                             attributes['transcript_name'] = attributes['transcript_id']
@@ -479,7 +488,7 @@ class Annotation(object):
                         self.transcript_dict[transcript_id] = t
                         self.transcripts.append(t)
 
-                    elif annot_type=='exon':
+                    elif annot_type == 'exon':
                         if 'exon_id' in attributes:
                             e = Exon(attributes['exon_id'], attributes['exon_number'], t, start_pos, end_pos)
                         else:
@@ -490,38 +499,38 @@ class Annotation(object):
 
                     # UTRs may span multiple exons and are separately annotated for each
                     # The order of UTRs in the annotation is always 5'->3': increasing coordinates for +strand genes, decreasing for -strand
-                    elif annot_type=='UTR':
+                    elif annot_type == 'UTR':
                         # cases:
                         #   - start of first exon -> 5' UTR
                         #   - start of an exon with preceding exon in 5' UTR -> 5' UTR
                         #   - else append to 3' UTR
-                        if g.strand=='+':
-                            if (start_pos==t.start_pos or
-                                    (len(t.utr5)<len(t.exons) and start_pos==t.exons[len(t.utr5)].start_pos)):
+                        if g.strand == '+':
+                            if (start_pos == t.start_pos or
+                                    (len(t.utr5)<len(t.exons) and start_pos == t.exons[len(t.utr5)].start_pos)):
                                 t.utr5.append([start_pos, end_pos])
                             else:
                                 t.utr3.append([start_pos, end_pos])
                         else:
-                            if (end_pos==t.end_pos or
-                                    (len(t.utr5)<len(t.exons) and end_pos==t.exons[len(t.utr5)].end_pos)):
+                            if (end_pos == t.end_pos or
+                                    (len(t.utr5)<len(t.exons) and end_pos == t.exons[len(t.utr5)].end_pos)):
                                 t.utr5.append([start_pos, end_pos])
                             else:
                                 t.utr3.append([start_pos, end_pos])
 
-                    elif annot_type=='CDS':
+                    elif annot_type == 'CDS':
                         t.exons[np.int(attributes['exon_number'])-1].CDS = [start_pos, end_pos]
 
                     # start/stop codons may be split across exons -> store/append coordinates
-                    elif annot_type=='start_codon':
+                    elif annot_type == 'start_codon':
                         t.start_codon.extend(np.arange(start_pos, end_pos+1))
 
-                    elif annot_type=='stop_codon':
+                    elif annot_type == 'stop_codon':
                         t.stop_codon.extend(np.arange(start_pos, end_pos+1))
 
-                    elif annot_type=='Selenocysteine':
+                    elif annot_type == 'Selenocysteine':
                         pass
 
-                    if np.mod(len(self.genes), 1000)==0 and verbose:
+                    if len(self.genes) % 1000 == 0 and verbose:
                         print(f'\rGenes parsed: {len(self.genes)}', end='')
             if verbose:
                 print(f'\rGenes parsed: {len(self.genes)}')
@@ -563,7 +572,7 @@ class Annotation(object):
     def query_genes(self, region_str):
         chrom, pos = region_str.split(':')
         pos = [int(i) for i in pos.split('-')]
-        if len(pos)==2:
+        if len(pos) == 2:
             return self.gene_interval_trees[chrom].find(pos[0], pos[1])
         else:
             return self.gene_interval_trees[chrom].find(pos[0], pos[0])
@@ -673,7 +682,7 @@ class Annotation(object):
 
         Definition used: exon unique to transcript, flanking exons present in other transcripts
         """
-        if not hasattr(self, 'cassette_transcripts') or len(self.cassette_transcripts)==0:
+        if not hasattr(self, 'cassette_transcripts') or len(self.cassette_transcripts) == 0:
             self.cassette_transcripts = []
             for g in self.genes:
                 # proj = np.bincount(np.concatenate([np.arange(e.start_pos-g.start_pos,e.end_pos-g.start_pos+1) for t in g.transcripts for e in t.exons]))
@@ -686,7 +695,7 @@ class Annotation(object):
                     if len(t.exons)>2:
                         cand = np.zeros(len(t.exons), dtype=bool)
                         for (i,e) in enumerate(t.exons[1:-1]):
-                            cand[i] = all(proj[e.start_pos-g.start_pos:e.end_pos-g.start_pos+1]==1)
+                            cand[i] = all(proj[e.start_pos-g.start_pos:e.end_pos-g.start_pos+1] == 1)
                         for i in np.arange(1,len(cand)-1):
                             if cand[i] and (not cand[i-1]) and (not cand[i+1]):
                                 e.iscassette = True
@@ -704,7 +713,7 @@ class Annotation(object):
         for g in self.genes:
             for t in g.transcripts:
                 for i in range(len(t.exons)-1):
-                    if g.strand=='+':
+                    if g.strand == '+':
                         junctions.append([g.chr, t.exons[i].end_pos+1, t.exons[i+1].start_pos-1, g.id])
                     else:
                         junctions.append([g.chr, t.exons[i+1].end_pos+1, t.exons[i].start_pos-1, g.id])
@@ -728,8 +737,8 @@ class Annotation(object):
             idset  = set()  # chr.-specific set to preserve chr. order
             for g in annot.chr_genes[c]:
                 for t in g.transcripts:
-                    if len(t.exons)>1:
-                        if g.strand=='+':
+                    if len(t.exons) > 1:
+                        if g.strand == '+':
                             for i in range(len(t.exons)-1):
                                 if t.exons[i+1].start_pos-1 - t.exons[i].end_pos >= min_intron_length:
                                     j = g.chr+'_'+str(t.exons[i].end_pos+1)+'_'+str(t.exons[i+1].start_pos-1)
@@ -763,20 +772,20 @@ class Annotation(object):
 
     def get_gene_index(self, query):
         """Return gene index(es) corresponding to gene_id or gene_name"""
-        if len(query)>4 and query[:4]=='ENSG':
-            return np.nonzero(query==self.gene_ids)[0]
+        if len(query) > 4 and query[:4] == 'ENSG':
+            return np.nonzero(query == self.gene_ids)[0]
         else:
-            return np.nonzero(query==self.gene_names)[0]
+            return np.nonzero(query == self.gene_names)[0]
 
 
     def get_gene(self, query):
         """Return gene(s) corresponding to gene_id or gene_name"""
         # if not isinstance(query, Iterable):
-        if len(query)>4 and query[:4]=='ENSG':
-            g = self.genes[np.where(query==self.gene_ids)[0]]
+        if len(query) > 4 and query[:4] == 'ENSG':
+            g = self.genes[np.where(query == self.gene_ids)[0]]
         else:
-            g = self.genes[np.where(query==self.gene_names)[0]]
-        if len(g)==1:
+            g = self.genes[np.where(query == self.gene_names)[0]]
+        if len(g) == 1:
             g = g[0]
         return g
 
@@ -836,7 +845,7 @@ class Annotation(object):
             gm /= len(g.transcripts)
             g.mappability = gm
             # ex.append(gm)
-            if np.mod(i+1,100)==0 or i==len(self.genes)-1:
+            if i+1 % 100 == 0 or i == len(self.genes)-1:
                 print(f'\r  * Loading mappability. Genes parsed: {i+1:5d}/{len(self.genes):d}', end='')
         print()
         bw.close()
