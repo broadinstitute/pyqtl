@@ -224,6 +224,11 @@ class Gene(object):
                 e.start_pos += offset
                 e.end_pos += offset
 
+    def set_transcripts(self, transcripts):
+        self.transcripts = transcripts
+        self.start_pos = np.min([t.start_pos for t in transcripts])
+        self.end_pos = np.min([t.end_pos for t in transcripts])
+
     def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight_region=None,
              fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], wx=0.05, reference=None, ylabels='id',
              intron_coords=None, highlight_intron=None, clip_on=False, yoffset=0, xlim=None,
@@ -451,7 +456,7 @@ class Annotation(object):
                     # source = row[1]
                     annot_type = row[2]
                     start_pos = int(row[3])
-                    end_pos  = int(row[4])
+                    end_pos = int(row[4])
                     # row[5] is always '.'
                     strand = row[6]
                     # phase = row[7]
