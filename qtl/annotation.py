@@ -235,9 +235,9 @@ class Gene(object):
             reference = self.start_pos
 
         # cumulative lengths of exons and introns
-        ce = self.get_collapsed_coords()
-        exon_lengths = ce[:,1] - ce[:,0] + 1
-        intron_lengths = np.r_[0, ce[1:,0] - ce[:-1,1] - 1]
+        self.ce = self.get_collapsed_coords()
+        exon_lengths = self.ce[:,1] - self.ce[:,0] + 1
+        intron_lengths = np.r_[0, self.ce[1:,0] - self.ce[:-1,1] - 1]
         cumul_len = np.zeros(2*len(exon_lengths), dtype=np.int32)
         cumul_len[0::2] = intron_lengths
         cumul_len[1::2] = exon_lengths
@@ -256,7 +256,7 @@ class Gene(object):
 
     def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight_region=None,
              fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], wx=0.05, reference=None, ylabels='id',
-             intron_coords=None, highlight_intron=None, clip_on=False, yoffset=0, xlim=None,
+             intron_coords=None, highlight_exon=None, highlight_intron=None, highlight_color='k', clip_on=False, yoffset=0, xlim=None,
              highlight_transcripts=None, exclude_biotypes=[]):
         """Visualization"""
 
@@ -286,7 +286,14 @@ class Gene(object):
             ax = fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh])
             ax.margins(x=0)
             if coverage is not None:
-                ac = fig.add_axes([dl/fw, (db+ah+0.1)/fh, aw/fw, ch/fh])
+                ac = fig.add_axes([dl/fw, (db+ah+0.1)/fh, aw/fw, ch/fh], sharex=ax)
+
+        if highlight_exon is not None:
+            if isinstance(highlight_exon, str):
+                hs, he = highlight_exon.split(':')[-1].split('-')
+                highlight_exons = {(int(hs), int(he))}
+        else:
+            highlight_exons = None
 
         # plot transcripts; positions are in genomic coordinates
         for i,t in enumerate(transcripts[::-1], yoffset):
@@ -332,8 +339,11 @@ class Gene(object):
                 ex = np.arange(self.map_pos(e.start_pos), self.map_pos(e.end_pos)+1)  # position
 
                 vertices = np.vstack((np.hstack((ex, ex[::-1], ex[0])), i+scale*np.hstack((ev,-ev[::-1], ev[0])))).T
-                if highlight_transcripts is not None and t.id == highlight_transcripts:
-                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc='k', ec='none', lw=0, zorder=10, clip_on=clip_on)
+
+                if highlight_exons is not None and (e.start_pos, e.end_pos) in highlight_exons:
+                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=highlight_color, ec='none', lw=0, zorder=10, clip_on=clip_on)
+                elif highlight_transcripts is not None and t.id == highlight_transcripts:
+                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=highlight_color, ec='none', lw=0, zorder=10, clip_on=clip_on)
                 else:
                     patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=fc, ec='none', lw=0, zorder=10, clip_on=clip_on)
                 ax.add_patch(patch)
@@ -371,34 +381,38 @@ class Gene(object):
             format_plot(ax, tick_length=4, hide=['top', 'left', 'right'])
 
         if coverage is not None:
-            # only plot first max_intron bases of introns
-            if not ce[-1][1] - ce[0][0] + 1 == len(coverage):
-                raise ValueError(f'Coverage ({len(coverage)}) does not match gene length ({ce[-1][1]-ce[0][0]+1})')
-            # coordinates:
-            pidx = [np.arange(ce[0][0], ce[0][1]+1)]
-            for i in range(1, ce.shape[0]):
-                li = np.minimum(ce[i,0]-1 - ce[i-1,1], max_intron)
-                ri = np.arange(ce[i-1,1]+1, ce[i-1,1]+1 + li)
-                pidx.append(ri)
-                pidx.append(np.arange(ce[i][0], ce[i][1]+1))
-            pidx = np.concatenate(pidx)
-            pidx = pidx-pidx[0]
-
+            self.plot_coverage(coverage, ac, max_intron=max_intron)
             ac.set_title(f"{self.name} ({self.id})", fontsize=12)
-            if len(coverage.shape) == 1:
-                ac.fill_between(np.arange(len(pidx)), coverage[pidx], edgecolor='none', facecolor=3*[0.66])
-            else:
-                ac.plot(np.arange(len(pidx)), coverage[pidx])
-            ac.set_ylim([0, ac.get_ylim()[1]])
-            ac.set_xlim(ax.get_xlim())
-            ac.set_xticklabels([])
-            ac.set_xticks([])
-            format_plot(ac, tick_length=4, hide=['top', 'right'])
         elif not axes_input:
             ax.set_title(f"{self.name} ({self.id})", fontsize=12)
             ax.set_xlabel(self.chr, fontsize=12)
 
         return ax
+
+    def plot_coverage(self, coverage, ax, max_intron=1000):
+        # only plot first max_intron bases of introns
+        if not self.ce[-1][1] - self.ce[0][0] + 1 == len(coverage):
+            raise ValueError(f'Coverage ({len(coverage)}) does not match gene length ({ce[-1][1]-ce[0][0]+1})')
+        ax.margins(0)
+        # coordinates:
+        pidx = [np.arange(self.ce[0][0], self.ce[0][1]+1)]
+        for i in range(1, self.ce.shape[0]):
+            li = np.minimum(self.ce[i,0]-1 - self.ce[i-1,1], max_intron)
+            ri = np.arange(self.ce[i-1,1]+1, self.ce[i-1,1]+1 + li)
+            pidx.append(ri)
+            pidx.append(np.arange(self.ce[i][0], self.ce[i][1]+1))
+        pidx = np.concatenate(pidx)
+        pidx = pidx-pidx[0]
+
+        if len(coverage.shape) == 1:
+            ax.fill_between(np.arange(len(pidx)), coverage[pidx], edgecolor='none', facecolor=3*[0.66])
+        else:
+            ax.plot(np.arange(len(pidx)), coverage[pidx])
+        format_plot(ax, tick_length=4, hide=['top', 'right'])
+        plt.setp(ax.get_xticklabels(), visible=False)
+        for line in ax.xaxis.get_ticklines():
+            line.set_markersize(0)
+            line.set_markeredgewidth(0)
 
 
 def get_attributes(attr_str):
