@@ -206,12 +206,9 @@ class Gene(object):
         bw.close()
         return c
 
-    def get_collapsed_coords(self):
+    def get_collapsed_coords(self, exclude_biotypes=[]):
         """Returns coordinates of collapsed exons (= union of exons)"""
-        ecoord = []
-        for t in self.transcripts:
-            for e in t.exons:
-                ecoord.append([e.start_pos, e.end_pos])
+        ecoord = [[e.start_pos, e.end_pos] for t in self.transcripts for e in t.exons if t.type not in exclude_biotypes]
         return interval_union(ecoord)
 
     def shift_pos(self, offset):
@@ -229,13 +226,13 @@ class Gene(object):
         self.start_pos = np.min([t.start_pos for t in transcripts])
         self.end_pos = np.min([t.end_pos for t in transcripts])
 
-    def set_plot_coords(self, max_intron=1000, reference=None):
+    def set_plot_coords(self, max_intron=1000, exclude_biotypes=[], reference=None):
         """"""
         if reference is None:
             reference = self.start_pos
 
         # cumulative lengths of exons and introns
-        self.ce = self.get_collapsed_coords()
+        self.ce = self.get_collapsed_coords(exclude_biotypes=exclude_biotypes)
         exon_lengths = self.ce[:,1] - self.ce[:,0] + 1
         intron_lengths = np.r_[0, self.ce[1:,0] - self.ce[:-1,1] - 1]
         cumul_len = np.zeros(2*len(exon_lengths), dtype=np.int32)
@@ -265,7 +262,7 @@ class Gene(object):
         max_intron = int(max_intron)
         if reference is None:
             reference = self.start_pos
-        self.set_plot_coords(max_intron=max_intron, reference=reference)
+        self.set_plot_coords(max_intron=max_intron, exclude_biotypes=exclude_biotypes, reference=reference)
 
         axes_input = True
         if ax is None:
@@ -389,10 +386,10 @@ class Gene(object):
 
         return ax
 
-    def plot_coverage(self, coverage, ax, max_intron=1000):
+    def plot_coverage(self, coverage, ax, color=3*[0.66], max_intron=1000):
         # only plot first max_intron bases of introns
         if not self.ce[-1][1] - self.ce[0][0] + 1 == len(coverage):
-            raise ValueError(f'Coverage ({len(coverage)}) does not match gene length ({ce[-1][1]-ce[0][0]+1})')
+            raise ValueError(f'Coverage ({len(coverage)}) does not match gene length ({self.ce[-1][1]-self.ce[0][0]+1})')
         ax.margins(0)
         # coordinates:
         pidx = [np.arange(self.ce[0][0], self.ce[0][1]+1)]
@@ -405,7 +402,7 @@ class Gene(object):
         pidx = pidx-pidx[0]
 
         if len(coverage.shape) == 1:
-            ax.fill_between(np.arange(len(pidx)), coverage[pidx], edgecolor='none', facecolor=3*[0.66])
+            ax.fill_between(np.arange(len(pidx)), coverage[pidx], edgecolor='none', facecolor=color)
         else:
             ax.plot(np.arange(len(pidx)), coverage[pidx])
         format_plot(ax, tick_length=4, hide=['top', 'right'])
