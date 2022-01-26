@@ -90,6 +90,11 @@ def reverse_complement(s):
     return s.translate(str.maketrans('ATCG', 'TAGC'))[::-1]
 
 
+def _str_to_pos(region_str):
+    s, e = region_str.split(':')[-1].split('-')
+    return int(s), int(e)
+
+
 class Exon(object):
     """Exon"""
     def __init__(self, exon_id, number, transcript, start_pos, end_pos):
@@ -253,7 +258,8 @@ class Gene(object):
 
     def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight_region=None,
              fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], wx=0.05, reference=None, ylabels='id',
-             intron_coords=None, highlight_exon=None, highlight_intron=None, highlight_color='k', clip_on=False, yoffset=0, xlim=None,
+             highlight_exons=None, highlight_introns=None, highlight_introns2=None, 
+             highlight_color='k', clip_on=False, yoffset=0, xlim=None,
              highlight_transcripts=None, exclude_biotypes=[]):
         """Visualization"""
 
@@ -285,12 +291,23 @@ class Gene(object):
             if coverage is not None:
                 ac = fig.add_axes([dl/fw, (db+ah+0.1)/fh, aw/fw, ch/fh], sharex=ax)
 
-        if highlight_exon is not None:
-            if isinstance(highlight_exon, str):
-                hs, he = highlight_exon.split(':')[-1].split('-')
-                highlight_exons = {(int(hs), int(he))}
-        else:
-            highlight_exons = None
+        if highlight_exons is not None:
+            if isinstance(highlight_exons, str):
+                highlight_exons = {_str_to_pos(highlight_exons)}
+            else:
+                highlight_exons = {_str_to_pos(i) for i in highlight_exons}
+
+        if highlight_introns is not None:
+            if isinstance(highlight_introns, str):
+                highlight_introns = {_str_to_pos(highlight_introns)}
+            else:
+                highlight_introns = {_str_to_pos(i) for i in highlight_introns}
+
+        if highlight_introns2 is not None:
+            if isinstance(highlight_introns2, str):
+                highlight_introns2 = {_str_to_pos(highlight_introns2)}
+            else:
+                highlight_introns2 = {_str_to_pos(i) for i in highlight_introns2}
 
         # plot transcripts; positions are in genomic coordinates
         for i,t in enumerate(transcripts[::-1], yoffset):
@@ -306,27 +323,33 @@ class Gene(object):
             e = self.map_pos(t.end_pos)
             y = i - wx/2
             if highlight_transcripts is not None and t.id == highlight_transcripts:
-                patch = patches.Rectangle((s, y), e-s, wx, fc='k', zorder=9, clip_on=clip_on)
+                patch = patches.Rectangle((s, y), e-s, wx, fc='k', zorder=0, clip_on=clip_on)
             else:
-                patch = patches.Rectangle((s, y), e-s, wx, fc=fc, zorder=9, clip_on=clip_on)
+                patch = patches.Rectangle((s, y), e-s, wx, fc=fc, zorder=0, clip_on=clip_on)
             ax.add_patch(patch)
 
             # plot highlighted introns
-            if intron_coords is not None:
+            if highlight_introns is not None or highlight_introns2 is not None:
                 if self.strand == '+':
-                    introns = [[t.exons[i].end_pos, t.exons[i+1].start_pos] for i in range(len(t.exons)-1)]
+                    introns = {(t.exons[i].end_pos+1, t.exons[i+1].start_pos-1) for i in range(len(t.exons)-1)}
                 else:
-                    introns = [[t.exons[i+1].end_pos, t.exons[i].start_pos] for i in range(len(t.exons)-1)]
+                    introns = {(t.exons[i+1].end_pos+1, t.exons[i].start_pos-1) for i in range(len(t.exons)-1)}
 
-                for ic in intron_coords:
-                    if ic in introns:
-                        s = self.map_pos(ic[0])
-                        e = self.map_pos(ic[1])
-                        if ic == highlight_intron:
-                            patch = patches.Rectangle((s, i-wx*2), e-s, 4*wx, fc=hsv_to_rgb([0, 0.8, 1]), zorder=19, clip_on=clip_on)
-                        else:
-                            patch = patches.Rectangle((s, i-wx), e-s, 2*wx, fc=hsv_to_rgb([0.1, 0.8, 1]), zorder=19, clip_on=clip_on)
-                        ax.add_patch(patch)
+                if highlight_introns is not None:
+                    for ic in highlight_introns:
+                        if ic in introns:
+                            s = self.map_pos(ic[0]-1)+1
+                            e = self.map_pos(ic[1]+1)-1
+                            patch = patches.Rectangle((s, i-wx), e-s, 2*wx, fc=hsv_to_rgb([0, 0.8, 1]), zorder=1, clip_on=clip_on)
+                            ax.add_patch(patch)
+
+                if highlight_introns2 is not None:
+                    for ic in highlight_introns2:
+                        if ic in introns:
+                            s = self.map_pos(ic[0]-1)+1
+                            e = self.map_pos(ic[1]+1)-1
+                            patch = patches.Rectangle((s, i-wx), e-s, 2*wx, fc=hsv_to_rgb([0.1, 0.8, 1]), zorder=1, clip_on=clip_on)
+                            ax.add_patch(patch)
 
             # plot exons
             for e in t.exons:
@@ -338,11 +361,11 @@ class Gene(object):
                 vertices = np.vstack((np.hstack((ex, ex[::-1], ex[0])), i+scale*np.hstack((ev,-ev[::-1], ev[0])))).T
 
                 if highlight_exons is not None and (e.start_pos, e.end_pos) in highlight_exons:
-                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=highlight_color, ec='none', lw=0, zorder=10, clip_on=clip_on)
+                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=highlight_color, ec='none', lw=0, zorder=2, clip_on=clip_on)
                 elif highlight_transcripts is not None and t.id == highlight_transcripts:
-                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=highlight_color, ec='none', lw=0, zorder=10, clip_on=clip_on)
+                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=highlight_color, ec='none', lw=0, zorder=2, clip_on=clip_on)
                 else:
-                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=fc, ec='none', lw=0, zorder=10, clip_on=clip_on)
+                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=fc, ec='none', lw=0, zorder=2, clip_on=clip_on)
                 ax.add_patch(patch)
 
         if highlight_region is not None:
