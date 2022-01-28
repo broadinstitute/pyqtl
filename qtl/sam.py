@@ -25,7 +25,10 @@ def is_stranded(bam_file, paired_end=True, verbose=False):
 
     if paired_end:
         cmd = f'samtools view -q 255 -f2 -F3840 {bam_file} {plus_str} | cut -f2 | sort | uniq -c'
-        s = subprocess.check_output(cmd, shell=True).decode()
+        with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True) as p:
+            s, stderr = p.communicate()
+        if stderr == '[main_samview] random alignment retrieval only works for indexed BAM or CRAM files.\n':
+            raise ValueError('BAM/CRAM file must be indexed.')
         dfp = pd.read_csv(io.StringIO(s), sep='\s+', header=None, names=['count', 'flag']).set_index('flag').squeeze()
 
         cmd = f'samtools view -q 255 -f2 -F3840 {bam_file} {minus_str} | cut -f2 | sort | uniq -c'
