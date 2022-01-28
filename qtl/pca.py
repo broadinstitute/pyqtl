@@ -37,7 +37,7 @@ def normalize_counts(gct_df, C=None, threshold=10, threshold_frac=0.1):
     return gct_norm_std_df
 
 
-def get_pcs(gct_df, normalize=True, C=None, n_components=5):
+def get_pcs(gct_df, normalize=True, C=None, n_components=5, return_loadings=False):
     """
     Scale input GCT, threshold, normalize and calculate PCs
     """
@@ -52,4 +52,8 @@ def get_pcs(gct_df, normalize=True, C=None, n_components=5):
     pc_df = pd.DataFrame(P, index=gct_norm_std_df.columns,
                         columns=[f'PC{i}' for i in range(1, P.shape[1]+1)])
     pve_s = pd.Series(pca.explained_variance_ratio_ * 100, index=pc_df.columns, name='pve')
-    return pc_df, pve_s
+    if not return_loadings:
+        return pc_df, pve_s
+    else:
+        loadings_df = pd.DataFrame(pca.components_.T, index=gct_df.index, columns=pc_df.columns)
+        return pc_df, pve_s, loadings_df
