@@ -470,7 +470,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
                 y = len(gene)-1-k
                 # y = k
                 # print(xlim)
-                g.plot(ax=gax, yoffset=k, max_intron=1e9, fc='k', ec='none', reference=1, wx=0.1, scale=0.33, show_ylabels=False, clip_on=True)
+                g.plot(ax=gax, yoffset=k, max_intron=1e9, fc='k', ec='none', reference=1, wx=0.1, scale=0.33, ylabels=None, clip_on=True)
                 if gene_label_pos is None:
                     if gene[k].tss - m > m - gene[k].tss:
                         gax.annotate(gene[k].name, (np.minimum(gene[k].end_pos, xlim[1]), y), xytext=(5,0), textcoords='offset points', va='center', ha='left')
