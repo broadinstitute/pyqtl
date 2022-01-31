@@ -260,12 +260,13 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
         s = 0.66
         cax = fig.add_axes([(dl+aw+0.1)/fw, (fh-dt-ah+(1-s)/2*ah)/fh, s*ah/5/fw, s*ah/fh])
         cb = mpl.colorbar.ColorbarBase(cax, cmap=cmap,
-                                        norm=norm,
-                                        boundaries=bounds[1:],  # start at 0
-                                        ticks=bounds,
-                                        spacing='proportional',
-                                        orientation='vertical')
+                                       norm=norm,
+                                       boundaries=bounds[1:],  # start at 0
+                                       ticks=bounds[1:],
+                                       spacing='proportional',
+                                       orientation='vertical')
         cax.set_title('r$\mathregular{^2}$', fontsize=12)
+        cax.set_ylim([0,1])
 
     # common set of variants
     common_ix = pvals[0].index
