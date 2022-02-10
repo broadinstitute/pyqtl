@@ -89,21 +89,18 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
 
     if ch is None:
         ch = ah/2
-    if colorbar is None:
+    if not colorbar:
         return axes
-    elif isinstance(colorbar, Iterable):
-        cax = []
-        for k in colorbar:
-            i = k // nc  # row
-            j = k - i*nc  # col
-            cax.append(fig.add_axes([(dl+(j+1)*aw+j*dx+ds)/fw, (db+(nr-i)*ah+(nr-i-1)*dy-ch-ct)/fh, cw/fw, ch/fh]))
+    else:
+        if isinstance(colorbar, Iterable):
+            cax = []
+            for k in colorbar:
+                i = k // nc  # row
+                j = k - i*nc  # col
+                cax.append(fig.add_axes([(dl+(j+1)*aw+j*dx+ds)/fw, (db+(nr-i)*ah+(nr-i-1)*dy-ch-ct)/fh, cw/fw, ch/fh]))
+        else:
+            cax = fig.add_axes([(dl+nc*aw+(nc-1)*dx+ds)/fw, (db+nr*ah+(nr-1)*dy-ch-ct)/fh, cw/fw, ch/fh])
         return axes, cax
-
-    elif colorbar == True:
-        cax = fig.add_axes([(dl+nc*aw+(nc-1)*dx+ds)/fw, (db+nr*ah+(nr-1)*dy-ch-ct)/fh, cw/fw, ch/fh])
-        # cax = fig.add_axes([(dl+aw+ds)/fw, (db+ah-ch-ct)/fh, cw/fw, ch/fh])
-        return axes, cax
-
 
 
 def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
