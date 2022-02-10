@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.ticker as ticker
 import matplotlib.colors as colors
-from matplotlib.colors import hsv_to_rgb
+from matplotlib.colors import hsv_to_rgb, ListedColormap
 import seaborn as sns
 import scipy.cluster.hierarchy as hierarchy
 from cycler import cycler
@@ -17,22 +17,34 @@ from . import map as qtl_map
 
 
 def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
-                 colorbar=False, ds=0.15, cw=0.15, ct=0, ch=None):
+                 colorbar=False, ds=0.15, cw=0.12, ct=0, ch=None,
+                 margins=None, mx=0.5, dx=0.15, my=0.5, dy=0.15):
     """
     """
     dl, dr = xspace
     db, dt = yspace
     fw = dl + aw + dr
     fh = db + ah + dt
+    if margins in ['x', 'both']:
+        fw += dx + mx
+    if margins in ['y', 'both']:
+        fh += dy + my
     fig = plt.figure(facecolor=(1,1,1), figsize=(fw,fh))
-    ax = fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh])
-    if not colorbar:
-        return ax
+    axes = [fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh])]
+    if margins in ['y', 'both']:
+        axes.append(fig.add_axes([dl/fw, (db+ah+dy)/fh, aw/fw, my/fh], sharex=axes[0]))
+    if margins in ['x', 'both']:
+        axes.append(fig.add_axes([(dl+aw+dx)/fw, db/fh, mx/fw, ah/fh], sharey=axes[0]))
+        dl += aw + dx + mx + ds
     else:
+        dl += aw + ds
+    if colorbar:
         if ch is None:
-            ch = ah/2
-        cax = fig.add_axes([(dl+aw+ds)/fw, (db+ah-ch-ct)/fh, cw/fw, ch/fh])
-        return ax, cax
+            ch = 0.4*ah
+        axes.append(fig.add_axes([dl/fw, (db+ah-ch-ct)/fh, cw/fw, ch/fh]))
+    if len(axes) == 1:
+        axes = axes[0]
+    return axes
 
 
 #     if not box:
@@ -120,7 +132,7 @@ def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
         ax.get_yaxis().set_ticks_position('right')
     elif 'right' in hide:
         ax.get_yaxis().set_ticks_position('left')
-    elif len(hide)==0:
+    elif len(hide) == 0:
         ax.get_xaxis().set_ticks_position('bottom')
         ax.get_yaxis().set_ticks_position('left')
     else:
@@ -235,10 +247,10 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
         else:
             var_s = eqtl_df[eqtl_df.columns[2]]
             c = sorted(var_s.unique())
-            assert len(c)==2
+            assert len(c) == 2
 
-            gcounts1 = g[var_s==c[0]].value_counts().reindex(np.arange(3), fill_value=0)
-            gcounts2 = g[var_s==c[1]].value_counts().reindex(np.arange(3), fill_value=0)
+            gcounts1 = g[var_s == c[0]].value_counts().reindex(np.arange(3), fill_value=0)
+            gcounts2 = g[var_s == c[1]].value_counts().reindex(np.arange(3), fill_value=0)
             ax.set_xticklabels([
                 f'{ref}/{ref}\n({gcounts1[0]},{gcounts2[0]})',
                 f'{ref}/{alt}\n({gcounts1[1]},{gcounts2[1]})',
@@ -261,10 +273,10 @@ def plot_interaction(p, g, i, variant_id=None, annot=None, covariates_df=None, l
       lowess: fraction of data to use [0,1]
     """
 
-    assert np.all(p.index==g.index) and np.all(p.index==i.index)
+    assert p.index.equals(g.index) and p.index.equals(i.index)
 
     if covariates_df is not None:
-        assert np.all(p.index==covariates_df.index)
+        assert p.index.equals(covariates_df.index)
         X = np.c_[len(g)*[1],g,i,g*i,covariates_df]
     else:
         X = np.c_[len(g)*[1],g,i,g*i]
@@ -299,7 +311,7 @@ def plot_interaction(p, g, i, variant_id=None, annot=None, covariates_df=None, l
     # if mu[0]<mu[2]:
     #     gorder = gorder[::-1]
     for d in gorder:
-        ix = g[g==d].index
+        ix = g[g == d].index
         ax.scatter(i[ix], p[ix], s=s, alpha=alpha, edgecolor='none', label=labels[d], clip_on=False)
         if lowess is not None:
             lw = sm.nonparametric.lowess(p[ix], i[ix], lowess)
@@ -417,7 +429,7 @@ def plot_effects(dfs, args, ax=None,
         args = [args]
     ix = dfs[0].index.tolist()
     for df in dfs[1:]:
-        assert np.all(df.index==ix)
+        assert np.all(df.index == ix)
 
     if ax is None:
         dl, aw, dr = xspace
@@ -437,13 +449,13 @@ def plot_effects(dfs, args, ax=None,
 
     n = len(dfs)
     d = 0
-    if n==2:
+    if n == 2:
         # d = [-0.25, 0.25]
         # d = [-0.2, 0.2]
         d = [-0.15,0.15]
-    elif n==3:
+    elif n == 3:
         d = [-0.25, 0, 0.25]
-    elif n==4:
+    elif n == 4:
         d = [-0.25, -0.15, 0.15, 0.25]
 
     for k,df in enumerate(dfs):
@@ -455,7 +467,7 @@ def plot_effects(dfs, args, ax=None,
     if xlim is None:
         xlim = ax.get_xlim()
     for i in y:
-        if np.mod(i,2)==0:
+        if i % 2 == 0:
             c = [0.95]*3
             c = [1]*3
         else:
@@ -556,25 +568,39 @@ def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=10000
     return ax
 
 
+class CohortLabel(object):
+    def __init__(self, cohort_s, cmap=None, colors=None, vmin=None, vmax=None, bad_color=None):
+        assert cmap is not None or colors is not None
+        self.cohort_s = cohort_s
+        if cmap is not None and bad_color is not None:
+            cmap = copy.copy(cmap)
+            cmap.set_bad(bad_color, 1)
+        self.cmap = cmap
+        self.vmin = vmin
+        self.vmax = vmax
+        self.name = cohort_s.name
+
+        if cohort_s.dtype.name == 'category':
+            # get numerical index
+            self.values_s = cohort_s.astype(str).map({j:i for i,j in enumerate(cohort_s.cat.categories)})
+            if colors is not None:
+                self.cmap = ListedColormap(cohort_s.cat.categories.map(colors))
+        else:
+            self.values_s = cohort_s
+
+
 def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.Blues,
-               origin='lower', dendrogram_pos='top', ylabel_pos='left',
-               cohort_s=None, cohort_colors=None, #cohort_labels=None,
+               origin='lower', dendrogram_pos='top', ylabel_pos='left', cohort_labels=None,
                fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar_orientation='vertical',
                method='average', metric='euclidean', optimal_ordering=False, value_labels=False,
                rotation=-45, ha='left', va='top', tri=False, rasterized=False,
                dl=1, dr=1, dt=0.2, lh=0.1, ls=0.01,
                db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.175, dc=0.1, dtc=0):
 
-    if cohort_s is not None:
-        if isinstance(cohort_s, pd.Series):
-            cohort_s = [cohort_s]
-            # cohort_labels = [cohort_labels]
-        n = len(cohort_s)
-        if cohort_colors is None:
-            cohort_colors = []
-            for k in range(n):
-                nc = len(np.unique(cohort_s[k]))
-                cohort_colors.append({i:j for i,j in zip(np.unique(cohort_s[k]), plt.cm.get_cmap('Spectral_r', nc)(np.arange(nc)))})
+    if cohort_labels is not None:
+        if isinstance(cohort_labels, CohortLabel):
+            cohort_labels = [cohort_labels]
+        n = len(cohort_labels)
     else:
         n = 0
 
@@ -587,7 +613,7 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
     fw = dl+aw+dr
     fh = db+ah+ds+dd+dt+n*(lh+ls)
     fig = plt.figure(figsize=(fw,fh))
-    if dendrogram_pos=='top':
+    if dendrogram_pos == 'top':
         ax = fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh])
         lax = []
         for k in range(n):
@@ -607,21 +633,24 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
         with plt.rc_context({'lines.linewidth': lw}):
             z = hierarchy.dendrogram(Zx, ax=dax,  orientation='top', link_color_func=lambda k: 'k')
         ix = df.columns[hierarchy.leaves_list(Zx)]
-        iy = df.index[hierarchy.leaves_list(Zy)]
     else:
         ix = df.columns
     dax.axis('off')
 
-    if dendrogram_pos=='bottom':
+    if Zy is not None:
+        iy = df.index[hierarchy.leaves_list(Zy)]
+    else:
+        iy = df.index
+
+    if dendrogram_pos == 'bottom':
         dax.invert_yaxis()
 
     df = df.loc[iy, ix].copy()
     if tri:
-        if dendrogram_pos=='top':
+        if dendrogram_pos == 'top':
             df.values[np.triu_indices(df.shape[0])] = np.NaN
-        elif dendrogram_pos=='bottom':
+        elif dendrogram_pos == 'bottom':
             df.values[np.tril_indices(df.shape[0])] = np.NaN
-
 
     if value_labels:
         irange = np.arange(df.shape[0])
@@ -631,7 +660,8 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
                 if not np.isnan(df.values[j,i]):
                     ax.text(i, j, f'{df.values[j,i]:.2f}', ha='center', va='center')
 
-    h = ax.imshow(df, origin=origin, cmap=cmap, vmin=vmin, vmax=vmax, rasterized=rasterized, aspect='auto')
+    h = ax.imshow(df, origin=origin, cmap=cmap, vmin=vmin, vmax=vmax, 
+                  interpolation='none', rasterized=rasterized, aspect='auto')
     ax.set_xticks(np.arange(df.shape[1]))
     ax.set_yticks(np.arange(df.shape[0]))
     ax.set_xticklabels(ix, rotation=rotation, fontsize=fontsize, ha=ha, va=va)
@@ -639,21 +669,20 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
 
     # plot cohort labels
     for k in range(n):
-        cohort_index_s = cohort_s[k].map({j:i for i,j in enumerate(cohort_s[k].unique())})
-        cmap2 = colors.ListedColormap([cohort_colors[k][j] for j in cohort_s[k].unique()], 'indexed')
-        lax[k].imshow(cohort_index_s[ix].values.reshape(1,-1), aspect='auto', origin='lower', cmap=cmap2)
-        # if cluster_labels is not None:
+        lax[k].imshow(cohort_labels[k].values_s[ix].values.reshape(1,-1), aspect='auto', origin='lower',
+                      cmap=cohort_labels[k].cmap, interpolation='none')#, vmin=cohort_labels[k].vmin, vmax=cohort_labels[k].vmax)
+
         if ylabel_pos == 'left':
-            lax[k].set_ylabel(cohort_s[k].name, fontsize=10, rotation=0, va='center', ha='right')
+            lax[k].set_ylabel(cohort_labels[k].name, fontsize=10, rotation=0, va='center', ha='right')
         elif ylabel_pos == 'right':
             lax[k].yaxis.set_label_position(ylabel_pos)
-            lax[k].set_ylabel(cohort_s[k].name, fontsize=10, rotation=0, va='center', ha='left')
+            lax[k].set_ylabel(cohort_labels[k].name, fontsize=10, rotation=0, va='center', ha='left')
         for i in lax[k].spines:
             lax[k].spines[i].set_visible(False)
         lax[k].set_xticks([])
         lax[k].set_yticks([])
 
-    if dendrogram_pos=='bottom':
+    if dendrogram_pos == 'bottom':
         ax.yaxis.tick_right()
     # else:
     #     ax.xaxis.tick_top()
