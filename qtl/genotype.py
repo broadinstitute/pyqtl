@@ -83,8 +83,9 @@ def get_genotypes_region(vcf, region, field='GT', dosages=True):
     s = subprocess.check_output(f'tabix {vcf} {region}',
                                 shell=True, executable='/bin/bash')
     s = s.decode().strip()
-    if len(s)==0:
-        raise ValueError(f'No variants in region {region}')
+    if len(s) == 0:
+        return None
+    #     raise ValueError(f'No variants in region {region}')
     s = s .split('\n')
     variant_ids = [si.split('\t', 3)[-2] for si in s]
     field_ix = s[0].split('\t')[8].split(':').index(field)
@@ -193,6 +194,22 @@ def get_genotypes(variant_ids, vcf, field='GT', drop_duplicates=True):
     if drop_duplicates:
         df = df[~df.index.duplicated()]
     return df
+
+
+def get_allele_stats(genotype_df):
+    """Returns allele frequency, minor allele samples, and minor allele counts (row-wise)."""
+    # allele frequency
+    n2 = 2 * genotype_df.shape[1]
+    af = genotype_df.sum(1) / n2
+    # minor allele samples and counts
+    ix = af <= 0.5
+    m = genotype_df > 0.5
+    a = m.sum(1)
+    b = (genotype_df < 1.5).sum(1)
+    ma_samples = np.where(ix, a, b)
+    a = (genotype_df * m).sum(1).astype(int)
+    ma_count = np.where(ix, a, n2-a)
+    return af, ma_samples, ma_count
 
 
 def load_vcf(vcf):
