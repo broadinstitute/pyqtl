@@ -122,7 +122,7 @@ def calculate_interaction(genotype_s, phenotype_s, interaction_s, covariates_df=
 
     # impute missing genotypes
     if impute:
-        impute_mean(genotype_s)
+        gt.impute_mean(genotype_s, verbose=False)
 
     # interaction term
     gi = genotype_s * interaction_s
