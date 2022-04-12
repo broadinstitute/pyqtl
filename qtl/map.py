@@ -84,7 +84,7 @@ def map_pairs(genotype_df, phenotype_df, covariates_df=None, impute=True):
     assert genotype_df.columns.equals(phenotype_df.columns)
     assert genotype_df.columns.equals(covariates_df.index)
     if impute:
-        impute_mean(genotype_df)
+        gt.impute_mean(genotype_df, verbose=False)
 
     # residualize genotypes and phenotype
     if covariates_df is not None:
