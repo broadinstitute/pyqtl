@@ -243,18 +243,23 @@ class Gene(object):
         cumul_len = np.zeros(2*len(exon_lengths), dtype=np.int32)
         cumul_len[0::2] = intron_lengths
         cumul_len[1::2] = exon_lengths
+
+        cumul_len_adj = cumul_len.copy()
+        cumul_len_adj[2::2] = np.minimum(cumul_len_adj[2::2], max_intron)
+
         cumul_len = np.cumsum(cumul_len)
 
-        # adjusted lengths, truncating long introns
-        cumul_len_adj = np.zeros(2*len(exon_lengths), dtype=np.int32)
-        if max_intron is not None:
-            intron_lengths[intron_lengths > max_intron] = max_intron
-        cumul_len_adj[0::2] = intron_lengths
-        cumul_len_adj[1::2] = exon_lengths
+        # # adjusted lengths, truncating long introns
+        # cumul_len_adj = np.zeros(2*len(exon_lengths), dtype=np.int32)
+        # if max_intron is not None:
+        #     intron_lengths[intron_lengths > max_intron] = max_intron
+        # cumul_len_adj[0::2] = intron_lengths
+        # cumul_len_adj[1::2] = exon_lengths
         cumul_len_adj = np.cumsum(cumul_len_adj)
 
-        cumul_len_diff = cumul_len - cumul_len_adj
-        self.map_pos = lambda x: x - reference - cumul_len_diff[np.searchsorted(cumul_len, x - self.start_pos, side='right')-1]
+        #cumul_len_diff = cumul_len - cumul_len_adj
+        #self.map_pos = lambda x: x - reference - cumul_len_diff[np.searchsorted(cumul_len, x - self.start_pos, side='right')-1]
+        self.map_pos = lambda x: np.interp(x - self.start_pos, cumul_len, cumul_len_adj) + reference
 
     def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight_region=None,
              fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], wx=0.05, reference=None, ylabels='id',
@@ -309,6 +314,9 @@ class Gene(object):
             else:
                 highlight_introns2 = {_str_to_pos(i) for i in highlight_introns2}
 
+        if highlight_transcripts is not None and isinstance(highlight_transcripts, str):
+            highlight_transcripts = [highlight_transcripts]
+
         # plot transcripts; positions are in genomic coordinates
         for i,t in enumerate(transcripts[::-1], yoffset):
             # UTR mask
@@ -322,7 +330,7 @@ class Gene(object):
             s = self.map_pos(t.start_pos)
             e = self.map_pos(t.end_pos)
             y = i - wx/2
-            if highlight_transcripts is not None and t.id == highlight_transcripts:
+            if highlight_transcripts is not None and t.id in highlight_transcripts:
                 patch = patches.Rectangle((s, y), e-s, wx, fc='k', zorder=0, clip_on=clip_on)
             else:
                 patch = patches.Rectangle((s, y), e-s, wx, fc=fc, zorder=0, clip_on=clip_on)
@@ -362,7 +370,7 @@ class Gene(object):
 
                 if highlight_exons is not None and (e.start_pos, e.end_pos) in highlight_exons:
                     patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=highlight_color, ec='none', lw=0, zorder=2, clip_on=clip_on)
-                elif highlight_transcripts is not None and t.id == highlight_transcripts:
+                elif highlight_transcripts is not None and t.id in highlight_transcripts:
                     patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=highlight_color, ec='none', lw=0, zorder=2, clip_on=clip_on)
                 else:
                     patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=fc, ec='none', lw=0, zorder=2, clip_on=clip_on)
@@ -411,23 +419,25 @@ class Gene(object):
 
     def plot_coverage(self, coverage, ax, color=3*[0.66], max_intron=1000):
         # only plot first max_intron bases of introns
-        if not self.ce[-1][1] - self.ce[0][0] + 1 == len(coverage):
-            raise ValueError(f'Coverage ({len(coverage)}) does not match gene length ({self.ce[-1][1]-self.ce[0][0]+1})')
+        # if not self.ce[-1][1] - self.ce[0][0] + 1 == len(coverage):
+        #     raise ValueError(f'Coverage ({len(coverage)}) does not match gene length ({self.ce[-1][1]-self.ce[0][0]+1})')
         ax.margins(0)
         # coordinates:
-        pidx = [np.arange(self.ce[0][0], self.ce[0][1]+1)]
-        for i in range(1, self.ce.shape[0]):
-            li = np.minimum(self.ce[i,0]-1 - self.ce[i-1,1], max_intron)
-            ri = np.arange(self.ce[i-1,1]+1, self.ce[i-1,1]+1 + li)
-            pidx.append(ri)
-            pidx.append(np.arange(self.ce[i][0], self.ce[i][1]+1))
-        pidx = np.concatenate(pidx)
-        pidx = pidx-pidx[0]
+        # pidx = [np.arange(self.ce[0][0], self.ce[0][1]+1)]
+        # for i in range(1, self.ce.shape[0]):
+        #     li = np.minimum(self.ce[i,0]-1 - self.ce[i-1,1], max_intron)
+        #     ri = np.arange(self.ce[i-1,1]+1, self.ce[i-1,1]+1 + li)
+        #     pidx.append(ri)
+        #     pidx.append(np.arange(self.ce[i][0], self.ce[i][1]+1))
+        # pidx = np.concatenate(pidx)
+        # pidx = pidx-pidx[0]
 
+        # x = np.arange(len(pidx))
+        x = self.map_pos(np.arange(self.start_pos, self.end_pos+1))
         if len(coverage.shape) == 1:
-            ax.fill_between(np.arange(len(pidx)), coverage[pidx], edgecolor='none', facecolor=color)
+            ax.fill_between(x, coverage, edgecolor='none', facecolor=color)
         else:
-            ax.plot(np.arange(len(pidx)), coverage[pidx])
+            ax.plot(x, coverage)
         format_plot(ax, tick_length=4, hide=['top', 'right'])
         plt.setp(ax.get_xticklabels(), visible=False)
         for line in ax.xaxis.get_ticklines():
@@ -475,7 +485,7 @@ class Annotation(object):
         self.header = []
 
         if isinstance(varin, list):
-            self.genes = genes
+            self.genes = varin
         elif isinstance(varin, str):  # load from GTF
             gtfpath = varin
 
@@ -908,7 +918,8 @@ class Annotation(object):
     def write_gtf(self, gtf_path):
         """Write to GTF file. Only gene/transcript/exon features are used."""
         with open(gtf_path, 'w') as gtf:
-            gtf.write('\n'.join(self.header)+'\n')
+            if self.header:
+                gtf.write('\n'.join(self.header)+'\n')
             for g in self.genes:
                 gtf.write('\t'.join([g.chr, g.source, 'gene',
                                      str(g.start_pos), str(g.end_pos),
