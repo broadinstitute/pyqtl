@@ -610,6 +610,14 @@ class Annotation(object):
         self.chr_index = dict([(chrs[i], [sidx[i],eidx[i]]) for i in range(len(chrs))])
         self.chr_genes = dict([(chrs[i], self.genes[sidx[i]:eidx[i]+1]) for i in range(len(chrs))])
 
+        # dataframe of all genes
+        columns = ["name", "chr", "start_pos", "end_pos", "tss", "transcripts", "strand", "type"]
+        self.gene_df = pd.DataFrame(index = self.gene_ids, columns = columns)
+        for g in self.genes:
+            self.gene_df.loc[g.id, :] = pd.Series(
+              { x : getattr(g, x) for x in columns }
+            )
+
         # interval trees with gene starts/ends for each chr
         self.gene_interval_trees = defaultdict()
         for g in self.genes:
