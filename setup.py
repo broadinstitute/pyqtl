@@ -27,6 +27,7 @@ setup(
         'seaborn',
         'pyBigWig',
         'bx-python',
+        'tqdm',
     ],
     classifiers = [
         "Programming Language :: Python :: 3",
