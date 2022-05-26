@@ -96,15 +96,15 @@ def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=No
 
     # average pileups by genotype or category
     cols = np.unique(g[g.notnull()]).astype(int)
-    df = pd.concat([pileups_rpm_df[g[g==i].index].mean(axis=1).rename(i) for i in cols], axis=1)
+    df = pd.concat([pileups_rpm_df[g[g == i].index].mean(axis=1).rename(i) for i in cols], axis=1)
     return df
 
 
 def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive',
-         title=None, label_pos=None, show_variant_pos=False, max_intron=300, alpha=1, lw=0.5,
-         intron_coords=None, highlight_intron=None, shade_range=None,
-         ymax=None, rasterized=False, outline=False, labels=None,
-         dl=0.75, aw=4.5, dr=0.5, db=0.5, ah=1.5, dt=0.25, ds=0.4):
+         title=None, show_variant_pos=False, max_intron=300, alpha=1, lw=0.5,
+         highlight_introns=None, highlight_introns2=None, shade_range=None,
+         ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
+         dl=0.75, aw=4.5, dr=0.5, db=0.5, ah=1.5, dt=0.25, ds=0.2):
     """
       pileup_dfs:
     """
@@ -122,16 +122,29 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     if mappability_bigwig is not None:
         fh += da2
 
-    custom_cycler = cycler('color', [
-        hsv_to_rgb([0.55, 0.75, 0.8]),  #(0.2, 0.65, 0.8),  # blue
-        hsv_to_rgb([0.08, 1, 1]),  #(1.0, 0.5, 0.0),   # orange
-        hsv_to_rgb([0.3, 0.7, 0.7]),  #(0.2, 0.6, 0.17),  # green
-    ])
+    if variant_id is not None:
+        chrom, pos, ref, alt = variant_id.split('_')[:4]
+        pos = int(pos)
+        if isinstance(pileup_dfs[0].columns[0], int):
+            gtlabels = np.array([
+                f'{ref}{ref}',
+                f'{ref}{alt}',
+                f'{alt}{alt}',
+            ])
+        else:
+            gtlabels = None
+    else:
+        pos = None
+        gtlabels = None
 
-    x = np.arange(pileup_dfs[0].shape[0])
-    ifct = annotation.get_coord_transform(gene, max_intron=max_intron)  # compress introns
-    # ifct = lambda x: x
-    xi = ifct(x)
+    if pileup_dfs[0].shape[1] <= 3:
+        custom_cycler = cycler('color', [
+            hsv_to_rgb([0.55, 0.75, 0.8]),  #(0.2, 0.65, 0.8),  # blue
+            hsv_to_rgb([0.08, 1, 1]),  #(1.0, 0.5, 0.0),   # orange
+            hsv_to_rgb([0.3, 0.7, 0.7]),  #(0.2, 0.6, 0.17),  # green
+        ])
+    else:
+        custom_cycler = None
 
     fig = plt.figure(facecolor=(1,1,1), figsize=(fw,fh))
     ax = fig.add_axes([dl/fw, (db+da+ds)/fh, aw/fw, ah/fh])
@@ -142,61 +155,44 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         ax.set_prop_cycle(custom_cycler)
         axv.append(ax)
 
-    if variant_id is not None:
-        chrom,pos,ref,alt = variant_id.split('_')[:4]
-        pos = int(pos)
-        gtlabels = np.array([
-            f'{ref}{ref}',
-            f'{ref}{alt}',
-            f'{alt}{alt}',
-        ])
-    else:
-        pos = None
-        gtlabels = None
-
     s = pileup_dfs[0].sum()
     if isinstance(order, list):
         sorder = order
-    elif order=='additive':
+    elif order == 'additive':
         sorder = s.index
-        if s[sorder[0]]<s[sorder[-1]]:
+        if s[sorder[0]] < s[sorder[-1]]:
             sorder = sorder[::-1]
-    elif order=='sorted':
+    elif order == 'sorted':
         sorder = np.argsort(s)[::-1]
-    elif order=='none':
+    elif order == 'none':
         sorder = s.index
 
-    if ymax is None:
-        ymax = 0
-        for k,ax in enumerate(axv):
-            for i in sorder:
-            # for j,i in enumerate(sorder):
-                if i in pileup_dfs[k]:
-                    if outline:
-                        ax.plot(xi, pileup_dfs[k][i], label=i, lw=lw, alpha=alpha, rasterized=rasterized)
-                    else:
-                        ax.fill_between(xi, pileup_dfs[k][i], label=i, alpha=alpha, rasterized=rasterized)
-            ymax = np.maximum(ymax, ax.get_ylim()[1])
+    gene.set_plot_coords(max_intron=max_intron)
+    xi = gene.map_pos(np.arange(gene.start_pos, gene.end_pos+1))
 
+    for k,ax in enumerate(axv):
+        for i in sorder:
+            if i in pileup_dfs[k]:
+                if outline:
+                    ax.plot(xi, pileup_dfs[k][i], label=i, lw=lw, alpha=alpha, rasterized=rasterized)
+                else:
+                    ax.fill_between(xi, pileup_dfs[k][i], label=i, alpha=alpha, rasterized=rasterized)
 
-    ce = gene.get_collapsed_coords()
-    xl = gene.get_collapsed_coords().reshape(1,-1)[0]
-    if label_pos is not None:
-        xl = np.unique(np.r_[xl, label_pos])
-    x = xl - gene.start_pos
-
-    xinterp = ifct(x)
     if labels is None:
-        labels = ['Mean RPM']*num_pileups
+        labels = ['Mean RPM'] * num_pileups
     for k,ax in enumerate(axv):
         ax.margins(0)
-        ax.set_ylim([0, ax.get_ylim()[1]])
         ax.set_ylabel(labels[k], fontsize=12)
         qtl_plot.format_plot(ax, fontsize=10, lw=0.6)
         ax.tick_params(axis='x', length=3, width=0.6, pad=1)
-        ax.set_xticks(xinterp)
+        ax.set_xticks(gene.map_pos(gene.get_collapsed_coords().reshape(1,-1)[0]))
         ax.set_xticklabels([])
         ax.spines['left'].set_position(('outward', 6))
+
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ymax is not None:
+        ax.set_ylim([0, ymax])
 
     if gtlabels is None:
         leg = axv[-1].legend(loc='lower left', labelspacing=0.15, frameon=False, fontsize=9, borderaxespad=0.5,
@@ -212,14 +208,9 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     else:
         axv[-1].set_title(title, fontsize=11)
 
-    if label_pos is not None:  # drop this now that introns are highlighted in gene model?
-        for i in label_pos:
-            j = list(xl).index(i)
-            axv[0].get_xticklabels()[j].set_color("red")
-
     # highlight variant
     if show_variant_pos and pos is not None and pos >= gene.start_pos and pos <= gene.end_pos:
-        x = ifct(pos-gene.start_pos)
+        x = gene.map_pos(pos)
         for ax in axv:
             xlim = np.diff(ax.get_xlim())[0]
             ylim = np.diff(ax.get_ylim())[0]
@@ -241,8 +232,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
 
     # add gene model
     gax = fig.add_axes([dl/fw, db/fh, aw/fw, da/fh], sharex=axv[0])
-    gene.plot(ax=gax, max_intron=max_intron, intron_coords=intron_coords, wx=0.1,
-              highlight_intron=highlight_intron, fc='k', ec='none', clip_on=True)
+    gene.plot(ax=gax, max_intron=max_intron, wx=0.1, highlight_introns=highlight_introns,
+              highlight_introns2=highlight_introns2, fc='k', ec='none', clip_on=True)
     gax.set_title('')
     gax.set_ylabel('Isoforms', fontsize=10, rotation=0, ha='right', va='center')
     plt.setp(gax.get_xticklabels(), visible=False)
@@ -264,6 +255,6 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         axv.append(mpax)
         plt.sca(axv[0])
 
-    axv[-1].set_xlabel(f'Exon coordinates on {gene.chr}', fontsize=12)
+    # axv[-1].set_xlabel(f'Exon coordinates on {gene.chr}', fontsize=12)
 
     return axv

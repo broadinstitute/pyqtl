@@ -56,7 +56,7 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
 
 
 def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
-               x_offset=6, y_offset=6,
+               x_offset=6, y_offset=6, margins=0,
                dl=0.5, aw=2, dx=0.75, dr=0.25,
                db=0.5, ah=2, dy=0.75, dt=0.25,
                colorbar=None, ds=0.15, cw=0.15, ct=0, ch=None,
@@ -84,23 +84,25 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
                                   sharex=axes[0] if sharex and n>0 else None,
                                   sharey=axes[0] if sharey and n>0 else None)
                 format_plot(ax, fontsize=fontsize, hide=hide, x_offset=x_offset, y_offset=y_offset)
+                ax.margins(margins)
                 axes.append(ax)
                 n += 1
 
     if ch is None:
         ch = ah/2
-    if not colorbar:
-        return axes
-    else:
-        if isinstance(colorbar, Iterable):
-            cax = []
-            for k in colorbar:
-                i = k // nc  # row
-                j = k - i*nc  # col
-                cax.append(fig.add_axes([(dl+(j+1)*aw+j*dx+ds)/fw, (db+(nr-i)*ah+(nr-i-1)*dy-ch-ct)/fh, cw/fw, ch/fh]))
-        else:
-            cax = fig.add_axes([(dl+nc*aw+(nc-1)*dx+ds)/fw, (db+nr*ah+(nr-1)*dy-ch-ct)/fh, cw/fw, ch/fh])
+
+    if isinstance(colorbar, Iterable):
+        cax = []
+        for k in colorbar:
+            i = k // nc  # row
+            j = k - i*nc  # col
+            cax.append(fig.add_axes([(dl+(j+1)*aw+j*dx+ds)/fw, (db+(nr-i)*ah+(nr-i-1)*dy-ch-ct)/fh, cw/fw, ch/fh]))
         return axes, cax
+    elif colorbar == True:
+        cax = fig.add_axes([(dl+nc*aw+(nc-1)*dx+ds)/fw, (db+nr*ah+(nr-1)*dy-ch-ct)/fh, cw/fw, ch/fh])
+        return axes, cax
+    else:
+        return axes
 
 
 def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
