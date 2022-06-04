@@ -13,4 +13,4 @@ def refresh_gcs_token():
     """"""
     t = subprocess.check_output('gcloud auth application-default print-access-token',
                                 shell=True).decode().strip()
-    os.environ.putenv('GCS_OAUTH_TOKEN', t)
+    os.putenv('GCS_OAUTH_TOKEN', t)
