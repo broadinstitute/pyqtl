@@ -14,6 +14,18 @@ def to_bgzip(df, path, header=True, float_format=None):
     subprocess.check_call('tabix -f '+path, shell=True)
 
 
+def sort_bed(bed_df, inplace=True):
+    """Sort BED DataFrame"""
+    sorted_df = bed_df.sort_values(['chr', 'start', 'end'], key=lambda x:
+                    x.str.replace('chr','').str.replace('X','23').astype(int) if x.dtype == object else x,
+                    inplace=inplace)
+    if inplace:
+        bed_df.reset_index(drop=True, inplace=True)
+    else:
+        sorted_df.reset_index(drop=True, inplace=True)
+        return sorted_df
+
+
 def write_bed(bed_df, output_name, header=True, float_format=None):
     """Write DataFrame to BED format"""
     if header:  
