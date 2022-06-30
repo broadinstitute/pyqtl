@@ -110,6 +110,9 @@ class Exon(object):
             + f'; pos.: {self.start_pos-ref+1:d}-{self.end_pos-ref+1:d}'\
             + f'; length: {self.length:d}'
 
+    def __len__(self):
+        return self.length
+
     def __eq__(self, other):
         return (self.start_pos, self.end_pos)==(other.start_pos, other.end_pos)
 
@@ -189,8 +192,8 @@ class Gene(object):
 
     def __str__(self, ref=1):
         """Print gene/isoform structure"""
-        rep = f'Gene: {self.name} ({self.id}): {self.type}; chr. {self.chr}' +\
-             f": {self.start_pos-ref+1:d}-{self.end_pos-ref+1:d} ({self.strand})"
+        rep = f'Gene: {self.name} ({self.id}): {self.type}; ' +\
+             f"{self.chr}:{self.start_pos-ref+1:d}-{self.end_pos-ref+1:d} ({self.strand})"
         if len(self.transcripts)>1:
             rep = rep + f'; {len(self.transcripts)} isoforms'
         if isinstance(self.mappability, float):
@@ -229,7 +232,7 @@ class Gene(object):
     def set_transcripts(self, transcripts):
         self.transcripts = transcripts
         self.start_pos = np.min([t.start_pos for t in transcripts])
-        self.end_pos = np.min([t.end_pos for t in transcripts])
+        self.end_pos = np.max([t.end_pos for t in transcripts])
 
     def set_plot_coords(self, max_intron=1000, exclude_biotypes=[], reference=None):
         """"""
@@ -393,6 +396,7 @@ class Gene(object):
                 if not axes_input:
                     xlim = [xlim[0]-150, xlim[1]+150]
                 ax.set_xlim(xlim)
+
         if ylabels is not None:
             ax.set_yticks(range(len(transcripts)))
             ax.set_yticklabels([getattr(t, ylabels) for t in transcripts[::-1]], fontsize=9)
@@ -550,7 +554,6 @@ class Annotation(object):
                         e.attributes_string = row[8]
                         t.exons.append(e)
 
-
                     # UTRs may span multiple exons and are separately annotated for each
                     # The order of UTRs in the annotation is always 5'->3': increasing coordinates for +strand genes, decreasing for -strand
                     elif annot_type == 'UTR':
@@ -560,13 +563,13 @@ class Annotation(object):
                         #   - else append to 3' UTR
                         if g.strand == '+':
                             if (start_pos == t.start_pos or
-                                    (len(t.utr5)<len(t.exons) and start_pos == t.exons[len(t.utr5)].start_pos)):
+                                    (len(t.utr5) < len(t.exons) and start_pos == t.exons[len(t.utr5)].start_pos)):
                                 t.utr5.append([start_pos, end_pos])
                             else:
                                 t.utr3.append([start_pos, end_pos])
                         else:
                             if (end_pos == t.end_pos or
-                                    (len(t.utr5)<len(t.exons) and end_pos == t.exons[len(t.utr5)].end_pos)):
+                                    (len(t.utr5) < len(t.exons) and end_pos == t.exons[len(t.utr5)].end_pos)):
                                 t.utr5.append([start_pos, end_pos])
                             else:
                                 t.utr3.append([start_pos, end_pos])
