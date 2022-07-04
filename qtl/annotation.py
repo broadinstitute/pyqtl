@@ -448,6 +448,51 @@ class Gene(object):
             line.set_markersize(0)
             line.set_markeredgewidth(0)
 
+    def plot_junctions(self, ax, junction_df, coverage_s, show_counts=True,
+                       h=0.3, lw=3, lw_fct=np.sqrt, ec=[0.6]*3, clip_on=True):
+        """Plot junctions ("sashimi" plot)."""
+
+        # new axes
+        fig = ax.get_figure()
+        pos = ax.get_position()
+        aw, ah = pos.bounds[2:] * fig.get_size_inches()
+        ax0 = fig.add_axes(pos, fc='none')
+        ax0.set_xlim([0, 1])
+        ys = ah/aw  # correct for aspect ratio
+        ax0.set_ylim([0, ys])
+        for k in ax0.spines:
+            ax0.spines[k].set_visible(False)
+        ax0.set_xticks([])
+        ax0.set_yticks([])
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+
+        for _,r in junction_df.iterrows():
+            if r['start'] >= self.start_pos and r['end'] <= self.end_pos:
+                x1 = np.array([self.map_pos(r['start']), coverage_s[r['start']-1]])
+                x2 = np.array([self.map_pos(r['end']),   coverage_s[r['end']+1]])
+
+                # relative position
+                dx = xlim[1] - xlim[0]
+                dy = ylim[1] - ylim[0]
+                x1_t = np.array([(x1[0]-xlim[0])/dx, (x1[1]-ylim[0])/dy*ys])
+                x2_t = np.array([(x2[0]-xlim[0])/dx, (x2[1]-ylim[0])/dy*ys])
+
+                _plot_arc(ax0, x1_t, x2_t, h*ys, lw=lw * lw_fct(r['score']/junction_df['score'].max()), ec=ec, clip_on=clip_on)
+
+                if show_counts:
+                    x0_t = (x1_t + x2_t) / 2
+                    txt = ax0.text(x0_t[0], x0_t[1]+h*ys/2, r['score'], ha='center', va='center', clip_on=clip_on)
+                    txt.set_bbox(dict(facecolor='w', alpha=0.75, edgecolor='none', boxstyle="round,pad=0.1"))
+
+
+def _plot_arc(ax, x1, x2, h, lw=1, ec='k', clip_on=True):
+    x0 = (x1 + x2) / 2
+    d = x2 - x1
+    t = np.arctan(d[1]/d[0])
+    ax.add_patch(patches.Arc(x0, d[0] / np.cos(t), h, lw=lw, ec=ec, clip_on=clip_on,
+                             angle=t*180/np.pi, theta1=0, theta2=180))
+
 
 def get_attributes(attr_str):
     attributes = defaultdict()
