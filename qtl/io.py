@@ -82,7 +82,13 @@ def gtf_to_tss_bed(annotation_gtf, feature='gene', exclude_chrs=[], phenotype_id
     end = []
     gene_id = []
     gene_name = []
-    with open(annotation_gtf, 'r') as gtf:
+
+    if annotation_gtf.endswith('.gz'):
+        opener = gzip.open(annotation_gtf, 'rt')
+    else:
+        opener = open(annotation_gtf, 'r')
+
+    with opener as gtf:
         for row in gtf:
             row = row.strip().split('\t')
             if row[0][0]=='#' or row[2]!=feature: continue # skip header
