@@ -724,6 +724,7 @@ def hexdensity(x, y, bounds=None, bins='log', scale='log',
     if ax is None: # setup new axes
         ax, cax = setup_figure(2, 2, xspace=[0.75, 1], yspace=[0.75, 0.5], colorbar=True, ch=1, cw=0.12)
         ax.margins(0.01)
+        format_plot(ax, fontsize=fontsize-2, x_offset=6, y_offset=6)
 
     if cmap is None:
         cmap = copy.copy(plt.cm.RdYlBu_r)
@@ -733,15 +734,14 @@ def hexdensity(x, y, bounds=None, bins='log', scale='log',
     x = x.copy()
     y = y.copy()
     nanidx = (x == 0) | (y == 0)
-    x[nanidx] = np.NaN
-    y[nanidx] = np.NaN
+    if any(nanidx):
+        x[nanidx] = np.NaN
+        y[nanidx] = np.NaN
 
     h = ax.hexbin(x, y, bins=bins, xscale=scale, yscale=scale, linewidths=0.1,
                   gridsize=gridsize, cmap=cmap, vmin=vmin, vmax=vmax, mincnt=1, zorder=1,
                   clip_on=clip_on, rasterized=rasterized)
 
-    # ax.set_xticks(ax.get_yticks())
-    format_plot(ax, fontsize=fontsize-2, x_offset=6, y_offset=6)
     if bounds is None:
         xlim = ax.get_xlim()
         ylim = ax.get_ylim()
@@ -758,8 +758,9 @@ def hexdensity(x, y, bounds=None, bins='log', scale='log',
                     ha='right', va='bottom', fontsize=fontsize, zorder=2)
         t.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
 
-    hc = plt.colorbar(h, cax=cax, orientation='vertical', ticks=ticker.LogLocator(numticks=4))
-    hc.set_label('log$\mathregular{_{10}}$('+entity+')', fontsize=fontsize)
+    if cax is not None:
+        hc = plt.colorbar(h, cax=cax, orientation='vertical', ticks=ticker.LogLocator(numticks=4))
+        hc.set_label('log$\mathregular{_{10}}$('+entity+')', fontsize=fontsize)
 
     if isinstance(x, pd.Series):
         ax.set_xlabel(f'{x.name} ({unit})' if unit is not None else f'{x.name}', fontsize=fontsize)
