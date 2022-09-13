@@ -223,9 +223,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         if isinstance(shade_range, str):
             shade_range = shade_range.split(':')[-1].split('-')
         shade_range = np.array(shade_range).astype(int)
-        shade_range -= gene.start_pos
-
-        shade_range = ifct(shade_range)
+        shade_range = gene.map_pos(shade_range)
         for k in range(len(shade_range)-1):
             axv[-1].add_patch(patches.Rectangle((shade_range[k], 0), shade_range[k+1]-shade_range[k], ax.get_ylim()[1],
                               facecolor=[0.8]*3 if k % 2 == 0 else [0.9]*3, zorder=-10))
