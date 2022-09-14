@@ -56,7 +56,7 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
 
 
 def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
-               x_offset=6, y_offset=6, margins=0,
+               x_offset=6, y_offset=6, margins=None,
                dl=0.5, aw=2, dx=0.75, dr=0.25,
                db=0.5, ah=2, dy=0.75, dt=0.25,
                colorbar=None, ds=0.15, cw=0.15, ct=0, ch=None,
@@ -166,12 +166,15 @@ def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
 
 
 def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=None, covariates_df=None,
-            legend_text=None, normalized=False, loc=None, ax=None, color=[0.5]*3,
+            legend_text=None, show_pval=False, normalized=False, loc=None, ax=None, color=[0.5]*3,
             variant_id=None, jitter=0, bvec=None, boxplot=False, xlabel=None,
             ylabel='Normalized expression', title=None, show_counts=True):
     """"""
 
     assert p.index.equals(g.index)
+
+    if show_pval:
+        pval = qtl_map.calculate_association(g, p, covariates_df=covariates_df)['pval_nominal'][0]
 
     if covariates_df is not None:
         # only residualize the phenotype for plotting
@@ -195,10 +198,9 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
                     hsv_to_rgb([0.575, 1, 0.8])
                 ]
             pal = sns.color_palette(split_colors)
-
             i = eqtl_df.columns[2]
             sns.violinplot(x="genotype", y="phenotype", hue=i, hue_order=sorted(eqtl_df[i].unique()),
-                           data=eqtl_df, palette=pal, ax=ax, order=[0,1,2], scale='width', dogde=False, linewidth=1, width=0.75)
+                           data=eqtl_df, palette=pal, ax=ax, order=[0,1,2], scale='width', cut=0, dogde=False, linewidth=1, width=0.75)
             l = ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1), fontsize=8, handlelength=0.6, ncol=2, handletextpad=0.5, labelspacing=0.33)
             l.set_title(None)
         else:
@@ -206,8 +208,8 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
                 color,
             ]
             pal = sns.color_palette(colors)
-            sns.violinplot(x="genotype", y="phenotype",
-                           data=eqtl_df, palette=pal, ax=ax, order=[0,1,2])
+            sns.violinplot(x="genotype", y="phenotype", data=eqtl_df,
+                           cut=0, palette=pal, ax=ax, order=[0,1,2])
     else:
         pass
         # if labels is not None:
@@ -255,6 +257,9 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
                 f'{ref}/{alt}\n({gcounts1[1]},{gcounts2[1]})',
                 f'{alt}/{alt}\n({gcounts1[2]},{gcounts2[2]})',
             ])
+
+    if show_pval:
+        ax.text(0.05, 1, f"P = {pval:.2g}", va='top', ha='left', transform=ax.transAxes, fontsize=11)
 
     return ax
 
@@ -599,6 +604,8 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
     if cohort_labels is not None:
         if isinstance(cohort_labels, CohortLabel):
             cohort_labels = [cohort_labels]
+        else:
+            assert all([isinstance(i, CohortLabel) for i in cohort_labels])
         n = len(cohort_labels)
     else:
         n = 0
@@ -659,7 +666,7 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
                 if not np.isnan(df.values[j,i]):
                     ax.text(i, j, f'{df.values[j,i]:.2f}', ha='center', va='center')
 
-    h = ax.imshow(df, origin=origin, cmap=cmap, vmin=vmin, vmax=vmax, 
+    h = ax.imshow(df.values, origin=origin, cmap=cmap, vmin=vmin, vmax=vmax,
                   interpolation='none', rasterized=rasterized, aspect='auto')
     ax.set_xticks(np.arange(df.shape[1]))
     ax.set_yticks(np.arange(df.shape[0]))
