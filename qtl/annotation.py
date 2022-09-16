@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
 import os
-import tempfile
 import subprocess
+import sys
+import tempfile
+import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.path as mpath
@@ -543,6 +545,7 @@ class Annotation(object):
             else:
                 opener = open(gtfpath, 'r')
 
+            print("Loading genes from GTF ...", file = sys.stderr)
             with opener as gtf:
                 for row in gtf:
                     if row[0] == '#':
@@ -633,9 +636,9 @@ class Annotation(object):
                         pass
 
                     if len(self.genes) % 1000 == 0 and verbose:
-                        print(f'\rGenes parsed: {len(self.genes)}', end='')
+                        print(f'\rGenes parsed: {len(self.genes)}', end='', file = sys.stderr)
             if verbose:
-                print(f'\rGenes parsed: {len(self.genes)}')
+                print(f'\rGenes parsed: {len(self.genes)}', file = sys.stderr)
 
         self.gene_ids = np.array(self.gene_ids)
         self.gene_names = np.array(self.gene_names)
@@ -657,6 +660,15 @@ class Annotation(object):
         self.chr_list = chrs
         self.chr_index = dict([(chrs[i], [sidx[i],eidx[i]]) for i in range(len(chrs))])
         self.chr_genes = dict([(chrs[i], self.genes[sidx[i]:eidx[i]+1]) for i in range(len(chrs))])
+
+        # dataframe of all genes
+        columns = ["name", "chr", "start_pos", "end_pos", "tss", "transcripts", "strand", "type"]
+        self.gene_df = pd.DataFrame(index = self.gene_ids, columns = columns)
+        print("Making gene dataframe ...", file = sys.stderr)
+        for g in tqdm.tqdm(self.genes):
+            self.gene_df.loc[g.id, :] = pd.Series(
+              { x : getattr(g, x) for x in columns }
+            )
 
         # interval trees with gene starts/ends for each chr
         self.gene_interval_trees = defaultdict()
