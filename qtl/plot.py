@@ -29,8 +29,8 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
         fw += dx + mx
     if margins in ['y', 'both']:
         fh += dy + my
-    fig = plt.figure(facecolor=(1,1,1), figsize=(fw,fh))
-    axes = [fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh])]
+    fig = plt.figure(facecolor=None, figsize=(fw,fh))
+    axes = [fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh], facecolor='none')]
     if margins in ['y', 'both']:
         axes.append(fig.add_axes([dl/fw, (db+ah+dy)/fh, aw/fw, my/fh], sharex=axes[0]))
     if margins in ['x', 'both']:
@@ -174,7 +174,9 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
     assert p.index.equals(g.index)
 
     if show_pval:
-        pval = qtl_map.calculate_association(g, p, covariates_df=covariates_df)['pval_nominal'][0]
+        pval = qtl_map.calculate_association(g, p, covariates_df=covariates_df)['pval_nominal']
+        if not np.isscalar(pval):
+            pval = pval[0]
 
     if covariates_df is not None:
         # only residualize the phenotype for plotting
