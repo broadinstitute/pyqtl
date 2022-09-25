@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 import tempfile
+import copy
 import subprocess
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -218,6 +219,20 @@ class Gene(object):
         """Returns coordinates of collapsed exons (= union of exons)"""
         ecoord = [[e.start_pos, e.end_pos] for t in self.transcripts for e in t.exons if t.type not in exclude_biotypes]
         return interval_union(ecoord)
+
+    def collapse(self, exclude_biotypes=['readthrough_transcript', 'retained_intron']):
+        """Return collapsed version of the gene"""
+        g = copy.deepcopy(self)
+        transcripts = [t for t in g.transcripts if t.type not in exclude_biotypes]
+        start_pos = min([t.start_pos for t in transcripts])
+        end_pos = max([t.end_pos for t in transcripts])
+        t = Transcript(g.id, g.name, g.type, g, start_pos, end_pos)
+        exon_coords = g.get_collapsed_coords(exclude_biotypes=exclude_biotypes)
+        if g.strand == '-':
+            exon_coords = exon_coords[::-1]
+        t.exons = [Exon(f"{g.id}_{k}", k, t, i[0], i[1]) for k,i in enumerate(exon_coords, 1)]
+        g.set_transcripts([t])
+        return g
 
     def shift_pos(self, offset):
         self.start_pos += offset
@@ -659,9 +674,9 @@ class Annotation(object):
         self.chr_genes = dict([(chrs[i], self.genes[sidx[i]:eidx[i]+1]) for i in range(len(chrs))])
 
         # interval trees with gene starts/ends for each chr
-        self.gene_interval_trees = defaultdict()
+        self.gene_interval_trees = defaultdict(IntervalTree)
         for g in self.genes:
-            self.gene_interval_trees.setdefault(g.chr, IntervalTree()).add(g.start_pos, g.end_pos+1, g)
+            self.gene_interval_trees[g.chr].add(g.start_pos, g.end_pos+1, g)
 
         # calculate transcript lenghts
         for g in self.genes:

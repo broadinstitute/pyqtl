@@ -32,7 +32,7 @@ def get_sample_ids(vcf):
     else:
         with gzip.open(vcf, 'rt') as f:
             for line in f:
-                if line[:2]=='##': continue
+                if line[:2] == '##': continue
                 break
         return line.strip().split('\t')[9:]
 
@@ -49,13 +49,13 @@ def get_genotypes_region(vcf, region, field='GT'):
     cmd = 'tabix '+vcf+' '+region
     s = subprocess.check_output(cmd, shell=True, executable='/bin/bash')
     s = s.decode().strip()
-    if len(s)==0:
+    if len(s) == 0:
         raise ValueError(f'No variants in region {region}')
     s = s .split('\n')
     variant_ids = [si.split('\t', 3)[-2] for si in s]
     field_ix = s[0].split('\t')[8].split(':').index(field)
 
-    if field=='GT':
+    if field == 'GT':
         gt_map = {'0/0':0, '0/1':1, '1/1':2, './.':np.NaN,
                   '0|0':0, '0|1':1, '1|0':1, '1|1':2, '.|.':np.NaN}
         s = [[gt_map[i.split(':', field_ix+1)[field_ix]] for i in si.split('\t')[9:]] for si in s]
@@ -73,7 +73,7 @@ def load_eqtl(eqtl_file, gene_id, chrom=None):
             p = eqtl_file.replace(re.findall('chr\d+', eqtl_file)[0], chrom)
         cols = ['phenotype_id', 'variant_id', 'pval_gi', 'pval_nominal']
         eqtl_df = pd.read_parquet(p, columns=cols)
-        eqtl_df = eqtl_df[eqtl_df['phenotype_id']==gene_id].set_index('variant_id').rename(columns={'pval_gi':'pval_nominal'})
+        eqtl_df = eqtl_df[eqtl_df['phenotype_id'] == gene_id].set_index('variant_id').rename(columns={'pval_gi':'pval_nominal'})
     else:
         s = subprocess.check_output(f'zcat {eqtl_file} | grep {gene_id}', shell=True).decode()
         eqtl_cols = ['gene_id', 'variant_id', 'tss_distance', 'ma_samples', 'ma_count', 'maf', 'pval_nominal', 'slope', 'slope_se']
@@ -112,14 +112,14 @@ def get_ld(vcf, variant_id, phenotype_bed, window=200000):
 def get_rsid(id_lookup_table, variant_id):
     s = subprocess.check_output(f'zcat {id_lookup_table} | grep {variant_id}', shell=True).decode()
     rs_id = [i for i in s.strip().split('\t') if i.startswith('rs')]
-    assert len(rs_id)==1
+    assert len(rs_id) == 1
     return rs_id[0]
 
 
 def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
                  highlight_ids=None, colorbar=True, ah=2, aw=2):
     """plot similar to LocusCompare (Liu et al., Nat Genet, 2019)"""
-    assert np.all(pval_df1.index==pval_df2.index)
+    assert pval_df1.index.equals(pval_df2.index)
 
     dl = 0.75
     dr = 0.75
@@ -219,8 +219,12 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
     elif isinstance(variant_ids, str):
         variant_ids = [variant_ids]*n
 
-    chrom, pos = pvals[0].loc[variant_ids[0], ['chr', 'position']]
-    pos = int(pos)
+    i = [i for i,p in enumerate(pvals) if variant_ids[0] in p.index]
+    if i:
+        chrom, pos = pvals[i[0]].loc[variant_ids[0], ['chr', 'position']]
+        pos = int(pos)
+    else:
+        raise ValueError(f"{variant_ids[0]} not found in any of the inputs.")
 
     # set up figure
     if chr_label_pos != 'bottom':
@@ -335,14 +339,25 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
 
         # plot lead/selected variant, add text label, etc.
         if show_lead:
-            # minpos = int(variant_id.split('_')[1])
-            minpos = pval_df.loc[variant_id, 'position']
+            if variant_id in pval_df.index:
+                minpos = pval_df.loc[variant_id, 'position']
+            else:
+                minpos = None
+
             if 'pip' not in pval_df:
                 ax.scatter(minpos, minp, **select_args)
-            else:
-                # ax.scatter(minpos, minp, **select_args)
-                ax.scatter(minpos, minp, c=pip_df.loc[variant_id, 'cs_id'], cmap=cs_cmap, norm=cs_norm,
-                          s=24, marker='D', ec='k', lw=0.25)
+            elif minpos is not None:  # highlight lead variant for each CS
+                pip_df2 = pip_df.loc[pip_df.groupby('cs_id').apply(lambda x: x['pip'].idxmax())]
+                ax.scatter(pip_df2['position'], pip_df2['pip'], c=pip_df2['cs_id'],
+                           cmap=cs_cmap, norm=cs_norm, s=24, marker='D', ec='k', lw=0.25)
+
+                for i,r in pip_df2.iterrows():
+                    i = i.split('_b')[0].replace('_',':',1)
+                    if (r['position']-xlim[0])/(xlim[1]-xlim[0]) < 0.55:  # right
+                        txt = ax.annotate(i, (r['position'], r['pip']), xytext=(5,5), textcoords='offset points')
+                    else:
+                        txt = ax.annotate(i, (r['position'], r['pip']), xytext=(-5,5), ha='right', textcoords='offset points')
+                    txt.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
 
             if rs_id is not None:
                 if isinstance(rs_id, str):
@@ -350,9 +365,9 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
                 else:
                     t = rs_id[k]
             else:
-                t = variant_id
+                t = variant_id.split('_b')[0].replace('_',':',1)
 
-            if show_rsid:  # text label
+            if show_rsid and minpos is not None and 'pip' not in pval_df:  # text label
                 if (minpos-xlim[0])/(xlim[1]-xlim[0]) < 0.55:  # right
                     txt = ax.annotate(t, (minpos, minp), xytext=(5,5), textcoords='offset points')
                 else:
@@ -392,7 +407,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
         ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True, min_n_ticks=3, nbins=4))
     axes[0].set_title(title, fontsize=12)
 
-    if chr_label_pos=='bottom':
+    if chr_label_pos == 'bottom':
         v = axes
     else:
         v = axes[1:]
@@ -468,10 +483,9 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
         else:
             m = np.mean(xlim)
             for k,g in enumerate(gene[::-1]):
+                g = g.collapse()
+                g.plot(ax=gax, yoffset=k, max_intron=1e9, fc='k', ec='none', wx=0.1, scale=0.33, ylabels=None, clip_on=True)
                 y = len(gene)-1-k
-                # y = k
-                # print(xlim)
-                g.plot(ax=gax, yoffset=k, max_intron=1e9, fc='k', ec='none', reference=1, wx=0.1, scale=0.33, ylabels=None, clip_on=True)
                 if gene_label_pos is None:
                     if gene[k].tss - m > m - gene[k].tss:
                         gax.annotate(gene[k].name, (np.minimum(gene[k].end_pos, xlim[1]), y), xytext=(5,0), textcoords='offset points', va='center', ha='left')
@@ -482,8 +496,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
                 elif gene_label_pos == 'right':
                     gax.annotate(gene[k].name, (np.minimum(gene[k].end_pos, xlim[1]), y), xytext=(5,0), textcoords='offset points', va='center', ha='left')
 
-
-        if chr_label_pos=='bottom':
+        if chr_label_pos == 'bottom':
             gax.set_xlabel(f'Position on {chrom} (Mb)', fontsize=14)
         else:
             plt.setp(gax.get_xticklabels(), visible=False)
@@ -543,7 +556,7 @@ def plot_ieqtl_locus(eqtl_df, ieqtl_df, gwas_df, r2_s, gene_id, variant_id, anno
 
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     mpl.use('Agg')
 
     parser = argparse.ArgumentParser(description='locus plot')
