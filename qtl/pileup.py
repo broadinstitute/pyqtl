@@ -4,6 +4,7 @@ import glob
 import os
 import subprocess
 import contextlib
+import tempfile
 import multiprocessing as mp
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -18,10 +19,13 @@ from . import genotype as gt
 
 @contextlib.contextmanager
 def cd(cd_path):
-    saved_path = os.getcwd()
-    os.chdir(cd_path)
-    yield
-    os.chdir(saved_path)
+    if cd_path is not None:
+        saved_path = os.getcwd()
+        os.chdir(cd_path)
+        yield
+        os.chdir(saved_path)
+    else:
+        yield
 
 
 def _samtools_depth_wrapper(args):
@@ -33,11 +37,8 @@ def _samtools_depth_wrapper(args):
     """
     bam_file, region_str, sample_id, bam_index_dir, depth = args
 
-    cmd = f'export GCS_OAUTH_TOKEN=$GCS_OAUTH_TOKEN; samtools depth -a -a -d {depth} -Q 255 -r {region_str} {bam_file}'
-    if bam_index_dir is not None:
-        with cd(bam_index_dir):
-            c = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
-    else:
+    cmd = f'samtools depth -a -a -d {depth} -Q 255 -r {region_str} {bam_file}'
+    with cd(bam_index_dir):
         c = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
 
     df = pd.DataFrame([i.split('\t') for i in c], columns=['chr', 'pos', sample_id])
@@ -60,6 +61,56 @@ def samtools_depth(region_str, bam_s, bam_index_dir=None, d=100000, num_threads=
     pileups_df = pd.concat(pileups_df, axis=1)
     pileups_df.index.name = 'position'
     return pileups_df
+
+
+def _read_regtools_junctions(junctions_file, convert_positions=True):
+    """
+    Read output from regtools junctions extract
+    and convert start/end positions to intron starts/ends.
+    """
+    junctions_df = pd.read_csv(junctions_file, sep='\t', header=None,
+                               usecols=[0, 1, 2, 4, 5, 10],
+                               names=['chrom', 'start', 'end', 'count', 'strand', 'block_sizes'])
+    if convert_positions:
+        junctions_df['start'] += junctions_df['block_sizes'].apply(lambda x: int(x.split(',')[0])) + 1
+        junctions_df['end'] -= junctions_df['block_sizes'].apply(lambda x: int(x.split(',')[1]))
+        junctions_df.index = junctions_df['chrom'] + ':' + junctions_df['start'].astype(str) + '-' + junctions_df['end'].astype(str) + ':' + junctions_df['strand']
+        return junctions_df['count']
+    return junctions_df
+
+
+def regtools_wrapper(args):
+    """Wrapper for regtools junctions extract"""
+    bam_file, region_str, sample_id, bam_index_dir, strand = args
+    with tempfile.TemporaryDirectory() as tempdir:
+        filtered_bam = os.path.join(tempdir, 'filtered.bam')
+        with cd(bam_index_dir):
+            subprocess.check_call(f"samtools view -b -F 2304 {bam_file} {region_str} > {filtered_bam}", shell=True)
+        subprocess.check_call(f"samtools index {filtered_bam}", shell=True)
+        junctions_file = os.path.join(tempdir, 'junctions.txt.gz')
+        cmd = f"regtools junctions extract \
+            -a 8 -m 50 -M 500000 -s {strand} \
+            {filtered_bam} | gzip -c > {junctions_file}"
+        subprocess.check_call(cmd, shell=True, stderr=subprocess.DEVNULL)
+        junctions_s = _read_regtools_junctions(junctions_file, convert_positions=True).rename(sample_id)
+    return junctions_s
+
+
+def regtools_extract_junctions(region_str, bam_s, bam_index_dir=None, strand=0, num_threads=12):
+    """
+      region_str: string in 'chr:start-end' format
+      bam_s: pd.Series or dict mapping sample_id->bam_path
+      bam_index_dir: directory containing local copies of the BAM/CRAM indexes
+    """
+    junctions_df = []
+    with mp.Pool(processes=num_threads) as pool:
+        for k,r in enumerate(pool.imap(regtools_wrapper, [(i,region_str,j,bam_index_dir,strand) for j,i in bam_s.items()]), 1):
+            print(f'\r  * running regtools junctions extract on region {region_str} for bam {k}/{len(bam_s)}', end='')
+            junctions_df.append(r)
+        print()
+    junctions_df = pd.concat(junctions_df, axis=1).fillna(0).astype(int)
+    junctions_df.index.name = 'junction_id'
+    return junctions_df
 
 
 def norm_pileups(pileups_df, libsize_s, covariates_df=None, id_map=lambda x: '-'.join(x.split('-')[:2])):
@@ -101,10 +152,10 @@ def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=No
 
 
 def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive',
-         title=None, show_variant_pos=False, max_intron=300, alpha=1, lw=0.5,
+         title=None, show_variant_pos=False, annot_track=None, max_intron=300, alpha=1, lw=0.5,
          highlight_introns=None, highlight_introns2=None, shade_range=None,
          ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
-         dl=0.75, aw=4.5, dr=0.5, db=0.5, ah=1.5, dt=0.25, ds=0.2):
+         dl=0.75, aw=4.5, dr=0.75, db=0.5, ah=1.5, dt=0.25, ds=0.2):
     """
       pileup_dfs:
     """
@@ -125,7 +176,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     if variant_id is not None:
         chrom, pos, ref, alt = variant_id.split('_')[:4]
         pos = int(pos)
-        if isinstance(pileup_dfs[0].columns[0], int):
+        if np.issubdtype(pileup_dfs[0].columns.dtype, np.integer):
             gtlabels = np.array([
                 f'{ref}{ref}',
                 f'{ref}{alt}',
@@ -194,12 +245,11 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     if ymax is not None:
         ax.set_ylim([0, ymax])
 
-    if gtlabels is None:
-        leg = axv[-1].legend(loc='lower left', labelspacing=0.15, frameon=False, fontsize=9, borderaxespad=0.5,
-                             borderpad=0, handlelength=0.75, bbox_to_anchor=(0,1.05), ncol=3)
-    else:
-        leg = axv[-1].legend(loc='upper left', labelspacing=0.15, frameon=False, fontsize=9, borderaxespad=0.5,
-                             borderpad=0, handlelength=0.75, labels=gtlabels[sorder])
+    if gtlabels is not None:
+        gtlabels = gtlabels[sorder]
+    leg = axv[-1].legend(loc='upper left', handlelength=1, bbox_to_anchor=(1.02,1),
+                         labelspacing=0.2, borderaxespad=0, labels=gtlabels)
+
     for line in leg.get_lines():
         line.set_linewidth(1)
 
@@ -230,7 +280,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
 
     # add gene model
     gax = fig.add_axes([dl/fw, db/fh, aw/fw, da/fh], sharex=axv[0])
-    gene.plot(ax=gax, max_intron=max_intron, wx=0.1, highlight_introns=highlight_introns,
+    gene.plot(ax=gax, max_intron=max_intron, wx=0.2, highlight_introns=highlight_introns,
               highlight_introns2=highlight_introns2, fc='k', ec='none', clip_on=True)
     gax.set_title('')
     gax.set_ylabel('Isoforms', fontsize=10, rotation=0, ha='right', va='center')
@@ -253,6 +303,10 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         axv.append(mpax)
         plt.sca(axv[0])
 
+    if annot_track is not None:
+        tax = fig.add_axes([dl/fw, 0/fh, aw/fw, da2/fh], sharex=axv[0])
+        gene.plot_coverage(coverage=annot_track, ax=tax, max_intron=max_intron)
+        tax.tick_params(length=0, labelbottom=False)
     # axv[-1].set_xlabel(f'Exon coordinates on {gene.chr}', fontsize=12)
 
     return axv
