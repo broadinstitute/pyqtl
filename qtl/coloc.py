@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 from statsmodels.formula.api import ols
+import itertools
 
 # Code adapted from
 # https://github.com/chr1swallace/coloc/blob/master/R/claudia.R
@@ -125,7 +126,7 @@ def combine_abf(l1, l2, p1=1e-4, p2=1e-4, p12=1e-5, verbose=False):
     pp_abf = pd.Series(pp_abf, index=[f'pp_h{i}_abf' for i in range(5)])
     if verbose:
         print(pp_abf)
-        print(f"PP abf for shared variant: {pp_abf['pp_h4_abf']*100:.1f}%")
+        print(f"PP abf for shared variant: {pp_abf['pp_h4_abf']*100:.3f}%")
     return pp_abf
 
 
@@ -177,7 +178,7 @@ def sdy_est(vbeta, maf, n):
     return np.sqrt(cf)
 
 
-def coloc_abf(df1, df2, N=None, sdy=None, p1=1e-4, p2=1e-4, p12=1e-5, verbose=False):
+def abf(df1, df2, N=None, sdy=None, p1=1e-4, p2=1e-4, p12=1e-5, verbose=False):
     """
     
     Args:
@@ -210,3 +211,157 @@ def coloc_abf(df1, df2, N=None, sdy=None, p1=1e-4, p2=1e-4, p12=1e-5, verbose=Fa
     merged_df['snp_pp_h4'] = np.exp(internal_sum_lABF - my_denom_log_abf)
     pp_abf = combine_abf(mdf1['lABF'], mdf2['lABF'], p1=p1, p2=p2, p12=p12, verbose=verbose)
     return pp_abf, merged_df
+
+
+
+def susie(s1, s2, verbose=False):
+    """
+    Colocalisation with multiple causal variants using SuSiE
+
+    s1, s2: outputs from SuSiE
+    """
+    cs1 = s1['sets']
+    cs2 = s2['sets']
+    isnps = s1['lbf_variable'].columns[s1['lbf_variable'].columns.isin(s2['lbf_variable'].columns)]
+    n = len(isnps)
+    if cs1['cs'] is None or cs2['cs'] is None or len(cs1['cs']) == 0 or len(cs2['cs']) == 0 or n == 0:
+        return None
+    if verbose:
+        print(f"Using {n} shared variants (of {s1['lbf_variable'].shape[1]} and {s2['lbf_variable'].shape[1]})")
+    idx1 = cs1['cs_index']
+    idx2 = cs2['cs_index']
+    bf1 = s1['lbf_variable'].loc[idx1, isnps]
+    bf2 = s2['lbf_variable'].loc[idx2, isnps]
+    ret = bf_bf(bf1, bf2)
+    # ret$summary[, `:=`(idx1, cs1$cs_index[idx1])]
+    # ret$summary[, `:=`(idx2, cs2$cs_index[idx2])]
+    return ret
+
+
+
+def bf_bf(bf1, bf2, p1=1e-4, p2=1e-4, p12=5e-6, overlap_min=0.5, trim_by_posterior=True, verbose=False):
+    """Colocalize two datasets represented by Bayes factors"""
+    if isinstance(bf1, pd.Series):
+        bf1 = bf1.to_frame().T
+    if isinstance(bf2, pd.Series):
+        bf2 = bf2.to_frame().T
+
+    # combinations to test
+    todo_df = pd.DataFrame(itertools.product(range(len(bf1)), range(len(bf2))), columns=['i', 'j'])
+    todo_df['pp4'] = 0
+
+    isnps = bf1.columns[bf1.columns.isin(bf2.columns)]
+    if len(isnps) == 0:
+        return None
+
+    pp1 = logbf_to_pp(bf1, p1, last_is_null=True)
+    pp2 = logbf_to_pp(bf2, p2, last_is_null=True)
+    ph0_1 = 1 - np.sum(pp1, 1)
+    ph0_2 = 1 - np.sum(pp2, 1)
+
+    prop1 = pp1[isnps].sum(1) / pp1.sum(1)
+    prop2 = pp2[isnps].sum(1) / pp2.sum(1)
+
+    if trim_by_posterior:
+        # drop combinations with insufficient overlapping variants
+        drop = (prop1.values[todo_df['i']] < overlap_min) | (prop2.values[todo_df['j']] < overlap_min)
+        if all(drop):
+            print("WARNING: snp overlap too small between datasets: too few snps with high posterior in one trait represented in other")
+            return None
+#             return(list(summary = cbind(data.table(nsnps = length(isnps),
+#                 hit1 = colnames(pp1)[apply(pp1, 1, which.max)][todo$i],
+#                 hit2 = colnames(pp2)[apply(pp2, 1, which.max)][todo$j],
+#                 PP.H0.abf = pmin(ph0.1[todo$i], ph0.2[todo$j]),
+#                 PP.H1.abf = NA, PP.H2.abf = NA, PP.H3.abf = NA,
+#                 PP.H4.abf = NA), todo[, .(idx1 = i, idx2 = j)])))
+        elif any(drop):
+            todo_df = todo_df[~drop]
+
+    bf1 = bf1[isnps]
+    bf2 = bf2[isnps]
+
+    results = []
+    PP = []
+    for k in range(len(todo_df)):
+        df = pd.DataFrame({'snp': isnps, 'bf1': bf1.values[todo_df['i'][k]], 'bf2': bf2.values[todo_df['j'][k]]})
+        df['internal_sum_lABF'] = df['bf1'] + df['bf2']
+        df['snp_pp_h4'] =  np.exp(df['internal_sum_lABF'] - logsum(df['internal_sum_lABF']))
+        pp_abf = combine_abf(df['bf1'], df['bf2'], p1, p2, p12, verbose=verbose)
+
+        PP.append(df['snp_pp_h4'])
+        if df['snp_pp_h4'].isnull().all():
+            df['snp_pp_h4'] = 0
+            pp_abf = pd.Series([1, 0, 0, 0, 0], index=pp_abf.index, dtype=np.float64)
+        hit1 = bf1.columns[np.argmax(bf1.values[todo_df['i'][k]])]
+        # if (is.null(hit1)) {
+        #     hit1 = "-"
+        #     pp.abf[c(1, 3)] = c(0, 1)
+        # }
+        hit2 = bf2.columns[np.argmax(bf2.values[todo_df['j'][k]])]
+        # if (is.null(hit2)) {
+        #     hit2 = "-"
+        #     pp.abf[c(1, 2)] = c(0, 1)
+        # }
+        results.append([df.shape[0], hit1, hit2] + pp_abf.tolist())
+    results = pd.DataFrame(results, columns=['nsnps', 'hit1', 'hit2'] + pp_abf.index.tolist())
+    results = pd.concat([results, todo_df[['i','j']].rename(columns={'i':'idx1', 'j':'idx2'})], axis=1)
+    PP = pd.DataFrame(PP).T
+    if len(todo_df) > 1:
+        PP.columns = [f"snp_pp_h4_row{i}" for i in range(len(todo_df))]
+    else:
+        PP.columns = "snp_pp_h4_abf"
+
+    m = results[['hit1', 'hit2']].duplicated()
+    if any(m):
+        results = results[~m]
+        PP = PP[PP.columns[~m]]
+
+    PP = pd.concat([pd.Series(isnps, name='snp'), PP], axis=1)
+#     hits = paste(results$hit1, results$hit2, sep = ".")
+#     if (any(duplicated(hits))) {
+#         results = results[!duplicated(hits)]
+#         PP = PP[, !duplicated(hits)]
+#     }
+    return {'summary': results, 'results': PP, 'priors': pd.Series({'p1':p1, 'p2':p2, 'p12':p12})}
+
+
+def logbf_to_pp(bf, pi, last_is_null=True):
+    """
+    Convert logBF matrix to PP matrix
+    bf: Bayes Factors --- L by p or p+1 matrix?
+    pi: prior probability
+    last_is_null: True if the last value of the BF matrix corresponds to the null hypythesis of no associations.
+    """
+    if isinstance(bf, pd.DataFrame):
+        cols = bf.columns
+        index = bf.index
+        bf = bf.values.copy()
+    else:
+        cols = None
+        bf = bf.copy()
+
+    n = bf.shape[1]
+    if last_is_null:
+        n -= 1
+    if np.ndim(pi) == 0:
+        if pi > 1/n:
+            pi = 1/n
+        if last_is_null:
+            pi = np.r_[np.full(n, pi), 1-n*pi]
+        else:
+            pi = np.full(n, pi)
+    m = pi == 0
+    if any(m):
+        pi[m] = 1e-16
+        pi /= np.sum(pi)
+    if last_is_null:
+        bf -= bf[:, [-1]]
+    priors = np.tile(np.log(pi), [bf.shape[0], 1])
+
+    x = bf + priors
+    mmax = np.max(x, 1, keepdims=True)
+    denom = mmax + np.log(np.sum(np.exp(x - mmax), 1, keepdims=True))
+    pp = np.exp(bf + priors - denom)
+    if cols is not None:
+        pp = pd.DataFrame(pp, columns=cols, index=index)
+    return pp
