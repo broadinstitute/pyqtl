@@ -111,8 +111,7 @@ def map_pairs(genotype_df, phenotype_df, covariates_df=None, impute=True):
     df = pd.DataFrame({'phenotype_id':phenotype_df.index, 'variant_id':genotype_df.index, 'pval_nominal':pval})
     df['slope'] = r * n
     df['slope_se'] = df['slope'].abs() / np.sqrt(tstat2)
-    df['maf'] = genotype_df.sum(1).values / (2*genotype_df.shape[1])
-    df['maf'] = np.where(df['maf']<=0.5, df['maf'], 1-df['maf'])
+    df['af'] = genotype_df.sum(1).values / (2*genotype_df.shape[1])
     return df
 
 
