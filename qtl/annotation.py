@@ -946,13 +946,16 @@ class Annotation(object):
         """
         # ex = []
         bw = pyBigWig.open(bigwig)
-        for i,g in enumerate(self.genes):
+        for i,g in enumerate(self.genes, 1):
             gm = 0
             for t in g.transcripts:
                 tm = 0
                 for e in t.exons:
-                    m = bw.stats(g.chr, e.start_pos-1, e.end_pos, exact=True)[0]
-                    # m = np.nanmean(bw.values(g.chr, e.start_pos-1, e.end_pos))
+                    if g.chr in bw.chroms():
+                        m = bw.stats(g.chr, e.start_pos-1, e.end_pos, exact=True)[0]
+                        # m = np.nanmean(bw.values(g.chr, e.start_pos-1, e.end_pos))
+                    else:
+                        m = np.NaN
                     tm += m
                     e.mappability = m
                     # ex.append(m)
@@ -962,10 +965,10 @@ class Annotation(object):
             gm /= len(g.transcripts)
             g.mappability = gm
             # ex.append(gm)
-            if i+1 % 100 == 0 or i == len(self.genes)-1:
-                print(f'\r  * Loading mappability. Genes parsed: {i+1:5d}/{len(self.genes):d}', end='')
-        print()
+            if i % 100 == 0 or i == len(self.genes):
+                print(f'\r  * Loading mappability. Genes parsed: {i:5d}/{len(self.genes)}', end='' if i < len(self.genes) else None)
         bw.close()
+
 
     def get_tss_bed(self):
         """Get DataFrame with [chr, TSS-1, TSS, gene_id] columns for each gene"""
@@ -977,6 +980,7 @@ class Annotation(object):
         # sort by start position
         bed_df = bed_df.groupby('chr', sort=False, group_keys=False).apply(lambda x: x.sort_values('start'))
         return bed_df
+
 
     def write_gtf(self, gtf_path):
         """Write to GTF file. Only gene/transcript/exon features are used."""
