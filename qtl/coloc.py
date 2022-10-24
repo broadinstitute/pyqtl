@@ -201,8 +201,17 @@ def abf(df1, df2, N=None, sdy=None, p1=1e-4, p2=1e-4, p12=1e-5, verbose=False):
         assert N is not None
         n2 = N
 
-    mdf1 = process_dataset(df1, N=n1, sdy=sdy)
-    mdf2 = process_dataset(df2, N=n2, sdy=sdy)
+    if 'p_std' in df1:
+        sdy1 = float(df1['p_std'][0])
+    else:
+        sdy1 = sdy
+    if 'p_std' in df2:
+        sdy2 = float(df2['p_std'][0])
+    else:
+        sdy2 = sdy
+    mdf1 = process_dataset(df1, N=n1, sdy=sdy1)
+    mdf2 = process_dataset(df2, N=n2, sdy=sdy2)
+
     merged_df = pd.merge(mdf1.reset_index(drop=True), mdf2.reset_index(drop=True), suffixes=('_1', '_2'), left_index=True, right_index=True)
     # merged_df = merged_df.sort_values('snp_1')
     internal_sum_lABF = merged_df['lABF_1'] + merged_df['lABF_2']
@@ -211,7 +220,6 @@ def abf(df1, df2, N=None, sdy=None, p1=1e-4, p2=1e-4, p12=1e-5, verbose=False):
     merged_df['snp_pp_h4'] = np.exp(internal_sum_lABF - my_denom_log_abf)
     pp_abf = combine_abf(mdf1['lABF'], mdf2['lABF'], p1=p1, p2=p2, p12=p12, verbose=verbose)
     return pp_abf, merged_df
-
 
 
 def susie(s1, s2, verbose=False):
@@ -236,7 +244,6 @@ def susie(s1, s2, verbose=False):
     # ret$summary[, `:=`(idx1, cs1$cs_index[idx1])]
     # ret$summary[, `:=`(idx2, cs2$cs_index[idx2])]
     return ret
-
 
 
 def bf_bf(bf1, bf2, p1=1e-4, p2=1e-4, p12=5e-6, overlap_min=0.5, trim_by_posterior=True, verbose=False):
@@ -317,11 +324,6 @@ def bf_bf(bf1, bf2, p1=1e-4, p2=1e-4, p12=5e-6, overlap_min=0.5, trim_by_posteri
         PP = PP[PP.columns[~m]]
 
     PP = pd.concat([pd.Series(isnps, name='snp'), PP], axis=1)
-#     hits = paste(results$hit1, results$hit2, sep = ".")
-#     if (any(duplicated(hits))) {
-#         results = results[!duplicated(hits)]
-#         PP = PP[, !duplicated(hits)]
-#     }
     return {'summary': results, 'results': PP, 'priors': pd.Series({'p1':p1, 'p2':p2, 'p12':p12})}
 
 

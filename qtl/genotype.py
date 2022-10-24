@@ -183,10 +183,10 @@ def get_genotypes(variant_ids, vcf, field='GT', drop_duplicates=True):
     s = s.decode().strip().split('\n')
     s = [i.split('\t') for i in s]
     variant_ids2 = [i[2] for i in s]
-    if field=='GT':
+    if field == 'GT':
         gt_ix = s[0][8].split(':').index('GT')
         dosages = [[gt_dosage_dict[j.split(':')[gt_ix]] for j in i[9:]] for i in s]
-    elif field=='DS':
+    elif field == 'DS':
         ds_ix = s[0][8].split(':').index('DS')
         dosages = np.float32([[j.split(':')[ds_ix] for j in i[9:]] for i in s])
     df = pd.DataFrame(dosages, index=variant_ids2, columns=get_sample_ids(vcf))
