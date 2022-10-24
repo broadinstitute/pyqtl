@@ -73,8 +73,9 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
         df['chr'] = df.index.map(lambda x: x.split('_')[0])
         df['position'] = df.index.map(lambda x: int(x.split('_')[1]))
     df.index.name = 'variant_id'
-    if isinstance(genotype, pd.Series):
-        df = df.iloc[0]
+    # if isinstance(genotype, pd.Series):
+    #     df = df.iloc[0]
+    df.loc[df['pval_nominal'] == 0, 'pval_nominal'] = np.nextafter(0, 1)  # np.finfo(np.float64).tiny
     return df
 
 
@@ -112,6 +113,7 @@ def map_pairs(genotype_df, phenotype_df, covariates_df=None, impute=True):
     df['slope'] = r * n
     df['slope_se'] = df['slope'].abs() / np.sqrt(tstat2)
     df['af'] = genotype_df.sum(1).values / (2*genotype_df.shape[1])
+    df['maf'] = np.where(df['af'] <= 0.5, df['af'], 1-df['af'])
     return df
 
 
@@ -173,12 +175,11 @@ def compute_ld(genotype_df, variant_id):
     return (g0 * g0.loc[variant_id]).sum(1)**2 / d
 
 
-def get_conditional_pvalues(group_df, genotypes, phenotype_df, covariates_df, phenotype_id=None, window=200000):
+def get_conditional_pvalues(group_df, genotypes, phenotype_df, covariates_df,
+                            phenotype_id=None, window=200000, maf_threshold=0):
     """"""
-    assert np.all(phenotype_df.columns==covariates_df.index)
+    assert phenotype_df.columns.equals(covariates_df.index)
     variant_id = group_df['variant_id'].iloc[0]
-    chrom, pos = variant_id.split('_')[:2]
-    pos = int(pos)
 
     if isinstance(genotypes, gt.GenotypeIndexer):
         gt_df = genotypes.get_genotype_window(variant_id, window=window)
@@ -190,7 +191,7 @@ def get_conditional_pvalues(group_df, genotypes, phenotype_df, covariates_df, ph
     maf = gt_df.sum(1) / (2*gt_df.shape[1])
     maf = np.where(maf<=0.5, maf, 1-maf)
 
-    gt_df = gt_df[maf>0]
+    gt_df = gt_df[maf >= maf_threshold]
 
     res = []
     if phenotype_id is not None:
