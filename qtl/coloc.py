@@ -230,16 +230,22 @@ def susie(s1, s2, verbose=False):
     """
     cs1 = s1['sets']
     cs2 = s2['sets']
-    isnps = s1['lbf_variable'].columns[s1['lbf_variable'].columns.isin(s2['lbf_variable'].columns)]
+    lbf1 = s1['lbf_variable']
+    lbf2 = s2['lbf_variable']
+    if not isinstance(lbf1, pd.DataFrame):
+        lbf1 = pd.DataFrame(lbf1, columns=s1['pip'].index)
+    if not isinstance(lbf2, pd.DataFrame):
+        lbf2 = pd.DataFrame(lbf2, columns=s2['pip'].index)
+    isnps = lbf1.columns[lbf1.columns.isin(lbf2.columns)]
     n = len(isnps)
     if cs1['cs'] is None or cs2['cs'] is None or len(cs1['cs']) == 0 or len(cs2['cs']) == 0 or n == 0:
         return None
     if verbose:
-        print(f"Using {n} shared variants (of {s1['lbf_variable'].shape[1]} and {s2['lbf_variable'].shape[1]})")
+        print(f"Using {n} shared variants (of {lbf1.shape[1]} and {lbf2.shape[1]})")
     idx1 = cs1['cs_index']
     idx2 = cs2['cs_index']
-    bf1 = s1['lbf_variable'].loc[idx1, isnps]
-    bf2 = s2['lbf_variable'].loc[idx2, isnps]
+    bf1 = lbf1.loc[idx1, isnps]
+    bf2 = lbf2.loc[idx2, isnps]
     ret = bf_bf(bf1, bf2)
     # ret$summary[, `:=`(idx1, cs1$cs_index[idx1])]
     # ret$summary[, `:=`(idx2, cs2$cs_index[idx2])]
@@ -316,7 +322,7 @@ def bf_bf(bf1, bf2, p1=1e-4, p2=1e-4, p12=5e-6, overlap_min=0.5, trim_by_posteri
     if len(todo_df) > 1:
         PP.columns = [f"snp_pp_h4_row{i}" for i in range(len(todo_df))]
     else:
-        PP.columns = "snp_pp_h4_abf"
+        PP.columns = ["snp_pp_h4_abf"]
 
     m = results[['hit1', 'hit2']].duplicated()
     if any(m):
