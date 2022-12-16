@@ -18,22 +18,22 @@ from . import map as qtl_map
 
 def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
                  colorbar=False, ds=0.15, cw=0.12, ct=0, ch=None,
-                 margins=None, mx=0.5, dx=0.15, my=0.5, dy=0.15):
+                 margin_axes=None, mx=0.5, dx=0.15, my=0.5, dy=0.15):
     """
     """
     dl, dr = xspace
     db, dt = yspace
     fw = dl + aw + dr
     fh = db + ah + dt
-    if margins in ['x', 'both']:
+    if margin_axes in ['x', 'both']:
         fw += dx + mx
-    if margins in ['y', 'both']:
+    if margin_axes in ['y', 'both']:
         fh += dy + my
     fig = plt.figure(facecolor=None, figsize=(fw,fh))
     axes = [fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh], facecolor='none')]
-    if margins in ['y', 'both']:
+    if margin_axes in ['y', 'both']:
         axes.append(fig.add_axes([dl/fw, (db+ah+dy)/fh, aw/fw, my/fh], sharex=axes[0]))
-    if margins in ['x', 'both']:
+    if margin_axes in ['x', 'both']:
         axes.append(fig.add_axes([(dl+aw+dx)/fw, db/fh, mx/fw, ah/fh], sharey=axes[0]))
         dl += aw + dx + mx + ds
     else:
@@ -563,8 +563,9 @@ def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=10000
     clower = -np.log10(scipy.stats.beta.ppf((1-ci)/2, xi, xi[::-1]))
     cupper = -np.log10(scipy.stats.beta.ppf((1+ci)/2, xi, xi[::-1]))
     ax.fill_between(x, cupper, clower, color=[[0.8]*3], clip_on=True, rasterized=True)
-    b = -np.log10([1/(ntests+1), ntests/(ntests+1)])
-    ax.plot(b, b, '--', lw=1, color=[0.2]*3, zorder=50, clip_on=False)
+    b = -np.log10([ntests/(ntests+1), 1/(ntests+1)])
+    ax.autoscale(False)
+    ax.plot(b, b, '--', lw=1, color=[0.2]*3, zorder=50, clip_on=True)
 
     ax.spines['left'].set_position(('outward', 6))
     ax.spines['bottom'].set_position(('outward', 6))
@@ -600,7 +601,7 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
                fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar_orientation='vertical',
                method='average', metric='euclidean', optimal_ordering=False, value_labels=False,
                rotation=-45, ha='left', va='top', tri=False, rasterized=False,
-               dl=1, dr=1, dt=0.2, lh=0.1, ls=0.01,
+               show_frame=False, dl=1, dr=1, dt=0.2, lh=0.1, ls=0.01,
                db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.175, dc=0.1, dtc=0):
 
     if cohort_labels is not None:
@@ -656,7 +657,10 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
     df = df.loc[iy, ix].copy()
     if tri:
         if dendrogram_pos == 'top':
-            df.values[np.triu_indices(df.shape[0])] = np.NaN
+            if origin == 'upper':
+                df.values[np.tril_indices(df.shape[0], -1)] = np.NaN
+            else:
+                df.values[np.triu_indices(df.shape[0])] = np.NaN
         elif dendrogram_pos == 'bottom':
             df.values[np.tril_indices(df.shape[0])] = np.NaN
 
@@ -672,7 +676,7 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
                   interpolation='none', rasterized=rasterized, aspect='auto')
     ax.set_xticks(np.arange(df.shape[1]))
     ax.set_yticks(np.arange(df.shape[0]))
-    ax.set_xticklabels(ix, rotation=rotation, fontsize=fontsize, ha=ha, va=va)
+    ax.set_xticklabels(ix, rotation=rotation, rotation_mode='anchor', fontsize=fontsize, ha=ha, va=va)
     ax.set_yticklabels(iy, fontsize=fontsize)
 
     # plot cohort labels
@@ -716,8 +720,9 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
     cbar.set_label(clabel, fontsize=cfontsize+2)
     cax.tick_params(labelsize=cfontsize)
 
-    for i in ['left', 'top', 'right', 'bottom']:
-        ax.spines[i].set_visible(False)
+    if not show_frame:
+        for i in ['left', 'top', 'right', 'bottom']:
+            ax.spines[i].set_visible(False)
     ax.tick_params(length=0)
 
     plt.sca(ax)

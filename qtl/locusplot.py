@@ -190,7 +190,7 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
 def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
                highlight_ids=None, credible_sets=None, show_lead=True, show_rsid=True,
                tracks=None, track_colors=None, shared_only=True,
-               xlim=None, ymax=None, sharey=None, labels=None, title=None, shade_range=None,
+               xlim=None, ymax=None, miny=5, sharey=None, labels=None, title=None, shade_range=None,
                label_pos='left', gene_label_pos=None, chr_label_pos='bottom', window=200000, colorbar=True,
                dl=0.75, aw=4, dr=0.75, db=0.5, ah=1.25, dt=0.25, ds=0.05, gh=0.2, th=1.5,
                single_ylabel=False, ylabel='-log$\mathregular{_{10}}$(p-value)', rasterized=False):
@@ -378,7 +378,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
     for k,ax in enumerate(axes):
         ax.margins(y=0.2)
         if ymax is None:
-            ax.set_ylim([0, ax.get_ylim()[1]])
+            ax.set_ylim([0, np.maximum(ax.get_ylim()[1], miny)])
         else:
             ax.set_ylim([0, ymax[k]])
         if shade_range is not None:  # highlight subregion with gray background
