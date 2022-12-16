@@ -19,7 +19,7 @@ import os
 import io
 import gzip
 import re
-from collections import Iterable
+from collections.abc import Iterable
 
 from . import annotation
 from . import genotype as gt

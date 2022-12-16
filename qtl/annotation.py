@@ -10,7 +10,7 @@ import matplotlib.path as mpath
 from matplotlib.colors import hsv_to_rgb
 import gzip
 import scipy.interpolate as interpolate
-from collections import defaultdict, Iterable
+from collections import defaultdict
 import pyBigWig
 from bx.intervals.intersection import IntervalTree
 
@@ -897,7 +897,6 @@ class Annotation(object):
 
     def get_gene(self, query):
         """Return gene(s) corresponding to gene_id or gene_name"""
-        # if not isinstance(query, Iterable):
         if len(query) > 4 and query[:4] == 'ENSG':
             g = self.genes[np.where(query == self.gene_ids)[0]]
         else:

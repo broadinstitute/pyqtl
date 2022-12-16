@@ -9,7 +9,7 @@ from matplotlib.colors import hsv_to_rgb, ListedColormap
 import seaborn as sns
 import scipy.cluster.hierarchy as hierarchy
 from cycler import cycler
-from collections import Iterable
+from collections.abc import Iterable
 import copy
 
 from . import stats
