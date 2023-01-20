@@ -55,5 +55,5 @@ def get_pcs(gct_df, normalize=True, C=None, n_components=5, return_loadings=Fals
     if not return_loadings:
         return pc_df, pve_s
     else:
-        loadings_df = pd.DataFrame(pca.components_.T, index=gct_df.index, columns=pc_df.columns)
+        loadings_df = pd.DataFrame(pca.components_.T, index=gct_norm_std_df.index, columns=pc_df.columns)
         return pc_df, pve_s, loadings_df
