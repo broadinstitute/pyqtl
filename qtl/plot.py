@@ -576,7 +576,7 @@ def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=10000
 
 
 class CohortLabel(object):
-    def __init__(self, cohort_s, cmap=None, colors=None, vmin=None, vmax=None, bad_color=None):
+    def __init__(self, cohort_s, cmap=None, colors=None, label_pos='left', vmin=None, vmax=None, bad_color=None):
         assert cmap is not None or colors is not None
         self.cohort_s = cohort_s
         if cmap is not None and bad_color is not None:
@@ -586,6 +586,7 @@ class CohortLabel(object):
         self.vmin = vmin
         self.vmax = vmax
         self.name = cohort_s.name
+        self.label_pos = label_pos
 
         if cohort_s.dtype.name == 'category':
             # get numerical index
@@ -595,43 +596,96 @@ class CohortLabel(object):
         else:
             self.values_s = cohort_s
 
+    def plot(self, ix=None, ax=None, show_frame=False):
+        if ax is None:
+            ax, cax = setup_figure(2, 0.5, colorbar=True, ch=0.5)
+            # ax, cax = setup_figure(0.5, 2, colorbar=True, ch=0.5)
+
+        if ix is None:
+            x = self.values_s.values
+        else:
+            x = self.values_s[ix].values
+
+        # detect orientation
+        bbox = ax.get_window_extent().transformed(ax.get_figure().dpi_scale_trans.inverted())
+        width, height = bbox.width, bbox.height
+        if width > height:
+            x = x.reshape(1, -1)
+        else:
+            x = x.reshape(-1, 1)
+
+        h = ax.imshow(x, aspect='auto', cmap=self.cmap, interpolation='none', origin='lower')
+        if width > height:
+            if self.label_pos == 'left':
+                ax.set_ylabel(self.name, fontsize=10, rotation=0, va='center', ha='right')
+            elif self.label_pos == 'right':
+                ax.yaxis.set_label_position('right')
+                ax.set_ylabel(self.name, fontsize=10, rotation=0, va='center', ha='left')
+            plt.setp(ax.get_yticklabels(), visible=False)
+
+        if not show_frame:
+            for i in ax.spines:
+                ax.spines[i].set_visible(False)
+        plt.setp(ax.get_xticklabels(), visible=False)
+        plt.setp(ax.get_yticklabels(), visible=False)
+
+        for line in ax.xaxis.get_ticklines() + ax.yaxis.get_ticklines():
+            line.set_markersize(0)
+            line.set_markeredgewidth(0)
+
 
 def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.Blues,
-               origin='lower', dendrogram_pos='top', ylabel_pos='left', cohort_labels=None,
+               origin='lower', dendrogram_pos='top', col_labels=None, row_labels=None,
                fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar_orientation='vertical',
                method='average', metric='euclidean', optimal_ordering=False, value_labels=False,
-               rotation=-45, ha='left', va='top', tri=False, rasterized=False,
+               show_xlabels=False, show_ylabels=False, rotation=-45, ha='left', va='top',
+               tri=False, rasterized=False,
                show_frame=False, dl=1, dr=1, dt=0.2, lh=0.1, ls=0.01,
                db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.175, dc=0.1, dtc=0):
-
-    if cohort_labels is not None:
-        if isinstance(cohort_labels, CohortLabel):
-            cohort_labels = [cohort_labels]
+    """"""
+    def check_labels(labels):
+        if labels is not None:
+            if isinstance(labels, CohortLabel):
+                labels = [labels]
+            else:
+                assert all([isinstance(i, CohortLabel) for i in labels])
+            n = len(labels)
         else:
-            assert all([isinstance(i, CohortLabel) for i in cohort_labels])
-        n = len(cohort_labels)
-    else:
-        n = 0
+            n = 0
+        return labels, n
+
+    col_labels, nc = check_labels(col_labels)
+    row_labels, nr = check_labels(row_labels)
 
     if Zx is None:
-        Zy = hierarchy.linkage(df,   method=method, metric=metric, optimal_ordering=optimal_ordering)
         Zx = hierarchy.linkage(df.T, method=method, metric=metric, optimal_ordering=optimal_ordering)
+        Zy = hierarchy.linkage(df,   method=method, metric=metric, optimal_ordering=optimal_ordering)
     elif Zy is None:
         Zy = Zx
 
-    fw = dl+aw+dr
-    fh = db+ah+ds+dd+dt+n*(lh+ls)
+    fw = dl + aw + dr + nr*(lh+ls)
+    fh = db + ah + ds + dd + dt + nc*(lh+ls)
     fig = plt.figure(figsize=(fw,fh))
+    dl2 = dl + nr*(lh+ls)
     if dendrogram_pos == 'top':
-        ax = fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh])
-        lax = []
-        for k in range(n):
-            lax.append(
-                fig.add_axes([dl/fw, (db+ah+(k+1)*ls+k*lh)/fh, aw/fw, lh/fh], sharex=ax)
+        ax = fig.add_axes([dl2/fw, db/fh, aw/fw, ah/fh])
+        # column labels
+        tax = []
+        for k in range(nc):
+            tax.append(
+                fig.add_axes([dl2/fw, (db+ah+(k+1)*ls+k*lh)/fh, aw/fw, lh/fh], sharex=ax)
             )
-        dax = fig.add_axes([dl/fw,         (db+ah+n*(ls+lh)+ds)/fh, aw/fw, dd/fh])
-        cax = fig.add_axes([(dl+aw+dc)/fw, (db+ah-ch-dtc)/fh, cw/fw, ch/fh])
-        axes = [ax, *lax, dax, cax]
+        # row labels
+        lax = []
+        for k in range(nr):
+            lax.append(
+                fig.add_axes([(dl+k*(lh+ls))/fw, db/fh, lh/fw, ah/fh], sharey=ax)
+            )
+        # dendrogram
+        dax = fig.add_axes([dl2/fw,         (db+ah+nc*(ls+lh)+ds)/fh, aw/fw, dd/fh])
+        # colorbar
+        cax = fig.add_axes([(dl2+aw+dc)/fw, (db+ah-ch-dtc)/fh, cw/fw, ch/fh])
+        axes = [ax, *lax, *tax, dax, cax]
     else:
         dax = fig.add_axes([dl/fw, db/fh, aw/fw, dd/fh])
         ax =  fig.add_axes([dl/fw, (db+dd+ds)/fh, aw/fw, ah/fh])
@@ -674,25 +728,25 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
 
     h = ax.imshow(df.values, origin=origin, cmap=cmap, vmin=vmin, vmax=vmax,
                   interpolation='none', rasterized=rasterized, aspect='auto')
-    ax.set_xticks(np.arange(df.shape[1]))
-    ax.set_yticks(np.arange(df.shape[0]))
-    ax.set_xticklabels(ix, rotation=rotation, rotation_mode='anchor', fontsize=fontsize, ha=ha, va=va)
-    ax.set_yticklabels(iy, fontsize=fontsize)
+    if show_xlabels:
+        ax.set_xticks(np.arange(df.shape[1]))
+        # ax.set_xticklabels(ix, rotation=rotation, rotation_mode='anchor', fontsize=fontsize, ha=ha, va=va)
+        ax.set_xticklabels(ix, rotation=90, fontsize=fontsize)
+        ax.tick_params(axis='x', pad=0, length=2)
+    if show_ylabels:
+        ax.set_yticks(np.arange(df.shape[0]))
+        ax.set_yticklabels(iy, fontsize=fontsize)
+    # plot labels
+    for k in range(nr):
+        row_labels[k].plot(ax=lax[k], ix=iy, show_frame=True)
+    for k in range(nc):
+        col_labels[k].plot(ax=tax[k], ix=ix, show_frame=True)
 
-    # plot cohort labels
-    for k in range(n):
-        lax[k].imshow(cohort_labels[k].values_s[ix].values.reshape(1,-1), aspect='auto', origin='lower',
-                      cmap=cohort_labels[k].cmap, interpolation='none')#, vmin=cohort_labels[k].vmin, vmax=cohort_labels[k].vmax)
-
-        if ylabel_pos == 'left':
-            lax[k].set_ylabel(cohort_labels[k].name, fontsize=10, rotation=0, va='center', ha='right')
-        elif ylabel_pos == 'right':
-            lax[k].yaxis.set_label_position(ylabel_pos)
-            lax[k].set_ylabel(cohort_labels[k].name, fontsize=10, rotation=0, va='center', ha='left')
-        for i in lax[k].spines:
-            lax[k].spines[i].set_visible(False)
-        lax[k].set_xticks([])
-        lax[k].set_yticks([])
+    if lax:
+        plt.setp(ax.get_yticklabels(), visible=False)
+        for line in ax.yaxis.get_ticklines():
+            line.set_markersize(0)
+            line.set_markeredgewidth(0)
 
     if dendrogram_pos == 'bottom':
         ax.yaxis.tick_right()
@@ -714,16 +768,15 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
         # ax.scatter(np.arange(df.shape[1]), [b]*df.shape[1], s=36, c=label_colors[hierarchy.leaves_list(Zx)], clip_on=False)
         # ax.tick_params(axis='x', pad=12)
 
+    # plot colorbar
     cbar = plt.colorbar(h, cax=cax, orientation=colorbar_orientation)
     cax.locator_params(nbins=4)
-
     cbar.set_label(clabel, fontsize=cfontsize+2)
     cax.tick_params(labelsize=cfontsize)
 
     if not show_frame:
         for i in ['left', 'top', 'right', 'bottom']:
             ax.spines[i].set_visible(False)
-    ax.tick_params(length=0)
 
     plt.sca(ax)
     return axes
