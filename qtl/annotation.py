@@ -161,6 +161,16 @@ class Transcript(object):
                 len(self.exons) == len(other.exons) and
                 np.all([i == j for i,j in zip(self.exons, other.exons)]))
 
+    def get_cds_coords(self, include_stop=True):
+        """Get genomic coordinates of coding sequence, including stop codon."""
+        cds_coords = []
+        for e in self.exons:
+            if hasattr(e, 'CDS'):
+                cds_coords.extend(np.arange(e.CDS[0], e.CDS[1]+1))
+        if cds_coords and include_stop:
+            cds_coords.extend(self.stop_codon)
+        return cds_coords
+
     def load_sequence(self, fasta):
         """Load transcript sequence from FASTA"""
         region_strs = [f'{self.gene.chr}:{e.start_pos}-{e.end_pos}' for e in self.exons]
