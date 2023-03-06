@@ -35,9 +35,11 @@ def _samtools_depth_wrapper(args):
     For files on GCP, GCS_OAUTH_TOKEN must be set.
     This can be done with qtl.refresh_gcs_token().
     """
-    bam_file, region_str, sample_id, bam_index_dir, depth = args
+    bam_file, region_str, sample_id, bam_index_dir, depth, user_project = args
 
-    cmd = f'samtools depth -a -a -d {depth} -Q 255 -r {region_str} {bam_file}'
+    cmd = f"samtools depth -a -a -d {depth} -Q 255 -r {region_str} {bam_file}"
+    if user_project is not None:
+        cmd += f"?userProject={user_project}"
     with cd(bam_index_dir):
         c = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
 
@@ -46,7 +48,7 @@ def _samtools_depth_wrapper(args):
     return df[sample_id].astype(np.int32)
 
 
-def samtools_depth(region_str, bam_s, bam_index_dir=None, d=100000, num_threads=12):
+def samtools_depth(region_str, bam_s, bam_index_dir=None, d=100000, num_threads=12, user_project=None):
     """
       region_str: string in 'chr:start-end' format
       bam_s: pd.Series or dict mapping sample_id->bam_path
@@ -54,7 +56,7 @@ def samtools_depth(region_str, bam_s, bam_index_dir=None, d=100000, num_threads=
     """
     pileups_df = []
     with mp.Pool(processes=num_threads) as pool:
-        for k,r in enumerate(pool.imap(_samtools_depth_wrapper, [(i,region_str,j,bam_index_dir,d) for j,i in bam_s.items()]), 1):
+        for k,r in enumerate(pool.imap(_samtools_depth_wrapper, [(i,region_str,j,bam_index_dir,d,user_project) for j,i in bam_s.items()]), 1):
             print(f'\r  * running samtools depth on region {region_str} for bam {k}/{len(bam_s)}', end='')
             pileups_df.append(r)
         print()
