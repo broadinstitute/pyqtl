@@ -134,8 +134,7 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
     # LocusZoom colors
     lz_colors = ["#7F7F7F", "#282973", "#8CCCF0", "#69BD45", "#F9A41A", "#ED1F24"]
     select_args = {'s':24, 'marker':'D', 'c':"#714A9D", 'edgecolor':'k', 'lw':0.25}
-    highlight_args = {'s':24, 'marker':'D', 'c':"#ED1F24", 'edgecolor':'k', 'lw':0.25}
-    indep_args = {'s':30, 'marker':'^', 'c':"#E200B2", 'edgecolor':'k', 'lw':0.25}
+    highlight_args = {'s':24, 'marker':'D', 'edgecolor':'k', 'lw':0.25}
     cmap = mpl.colors.ListedColormap(lz_colors)
     bounds = np.append(-1, np.arange(0,1.2,0.2))
     norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
@@ -144,12 +143,13 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
         s = 0.66
         cax = fig.add_axes([(dl+aw+0.2)/fw, (db+ah-1.25*s)/fh, s*0.25/fw, s*1.25/fh])
         cb = mpl.colorbar.ColorbarBase(cax, cmap=cmap,
-                                        norm=norm,
-                                        boundaries=bounds[1:],  # start at 0
-                                        ticks=bounds,
-                                        spacing='proportional',
-                                        orientation='vertical')
+                                       norm=norm,
+                                       boundaries=bounds[1:],  # start at 0
+                                       ticks=bounds[1:],
+                                       spacing='proportional',
+                                       orientation='vertical')
         cax.set_title('r$\mathregular{^2}$', fontsize=12)
+        cax.set_ylim([0,1])
 
     if rs_id is not None:
         t = rs_id
