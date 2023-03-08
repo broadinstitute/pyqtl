@@ -154,7 +154,7 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
     if rs_id is not None:
         t = rs_id
     else:
-        t = variant_id
+        t = variant_id.split('_b')[0].replace('_',':',1).replace('_','-')
 
     x = -np.log10(pval_df1['pval_nominal'])
     y = -np.log10(pval_df2['pval_nominal'])
@@ -352,7 +352,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
                            cmap=cs_cmap, norm=cs_norm, s=24, marker='D', ec='k', lw=0.25)
 
                 for i,r in pip_df2.iterrows():
-                    i = i.split('_b')[0].replace('_',':',1)
+                    i = i.split('_b')[0].replace('_',':',1).replace('_','-')
                     if (r['position']-xlim[0])/(xlim[1]-xlim[0]) < 0.55:  # right
                         txt = ax.annotate(i, (r['position'], r['pip']), xytext=(5,5), textcoords='offset points')
                     else:
@@ -365,7 +365,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
                 else:
                     t = rs_id[k]
             else:
-                t = variant_id.split('_b')[0].replace('_',':',1)
+                t = variant_id.split('_b')[0].replace('_',':',1).replace('_','-')
 
             if show_rsid and minpos is not None and 'pip' not in pval_df:  # text label
                 if (minpos-xlim[0])/(xlim[1]-xlim[0]) < 0.55:  # right
