@@ -645,7 +645,7 @@ class Annotation(object):
                                 t.utr3.append([start_pos, end_pos])
 
                     elif annot_type == 'CDS':
-                        t.exons[np.int(attributes['exon_number'])-1].CDS = [start_pos, end_pos]
+                        t.exons[int(attributes['exon_number'])-1].CDS = [start_pos, end_pos]
 
                     # start/stop codons may be split across exons -> store/append coordinates
                     elif annot_type == 'start_codon':
