@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import scipy.stats
+import re
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.ticker as ticker
@@ -374,8 +375,7 @@ def plot_ld(ld_df, ld_threshold=0.1, s=0.25, alpha=1, yscale=3, xunit=1e6,
     if end_pos is None:
         end_pos = variant_df['pos'][-1]
 
-    ld_df.rename(index=variant_df['pos'],
-                 columns=variant_df['pos'], inplace=True)
+    ld_df.rename(index=variant_df['pos'], columns=variant_df['pos'], inplace=True)
     ld_df.columns.name = 'col'
     ld_df.index.name = 'row'
     ld_df.values[np.triu_indices(ld_df.shape[0])] = np.NaN
@@ -423,6 +423,185 @@ def plot_ld(ld_df, ld_threshold=0.1, s=0.25, alpha=1, yscale=3, xunit=1e6,
 
     ax.set_xlabel(f"Position on {variant_df['chr'][0]} (Mb)", fontsize=14)
     return ax
+
+
+def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=None,
+                       track_colors=None, labels=None, order=None,
+                       pip_df=None, pip_order=None, pip_colors=None, pip_legend=False,
+                       gene=None, ld_marker_size=1, aw=6, ah=4, dl=1.5, dr=1.5, ph=None, gh=0.15):
+    """
+    Visualization of genetic locus, combining coverage tracks (e.g., ATAC-seq),
+    variants (e.g., fine-mapped QTLs), genes/transcripts, and LD.
+
+    Inputs:
+      pip_df: variants with PIPs from fine-mapping
+      tracks_dict: tracks
+      ld_df:  LD matrix
+    """
+
+    if isinstance(tracks_dict, dict):
+        ntracks = len(tracks_dict)
+        ah = ntracks*0.2
+    elif isinstance(tracks_dict, pd.DataFrame):
+        ntracks = tracks_dict.shape[1]
+    else:
+        ntracks = 0
+        ah = 0
+
+    if gene is not None:
+        if not isinstance(gene, Iterable):
+            gene = [gene]
+        gh = gh * len(gene)  # gene model
+    else:
+        gh = 0
+
+    db = 0.5
+    ldh = 1  # LD plot
+    ds0 = 0
+    ds = 0
+    if pip_df is None:
+        ph = 0
+    elif ph is None:
+        ph = 0.1*len(pip_df['trait_category'].unique())
+    dt = 0.25
+    fw = dl + aw + dr
+    fh = db + ldh + ds0 + gh + ds +ph + ds + ah + dt
+    fig = plt.figure(figsize=(fw,fh))
+    axes = []
+    if tracks_dict is not None:
+        ax =  fig.add_axes([dl/fw, (db+ldh+ds0+gh+ds+ph+ds)/fh, aw/fw, ah/fh], facecolor='none')
+        axes.append(ax)
+    if pip_df is not None:
+        fax = fig.add_axes([dl/fw, (db+ldh+ds0+gh+ds)/fh, aw/fw, ph/fh], facecolor='none', sharex=axes[0] if len(axes)>0 else None)
+        axes.append(fax)
+    if gene is not None:
+        gax = fig.add_axes([dl/fw, (db+ldh+ds0)/fh, aw/fw, gh/fh], facecolor='none')
+        axes.append(gax)
+    if ld_df is not None:
+        lax = fig.add_axes([dl/fw, db/fh, aw/fw, ldh/fh], facecolor='none', sharex=axes[0] if len(axes)>0 else None)
+        axes.append(lax)
+
+    chrom, start_pos, end_pos = re.split(':|-', region_str)
+    start_pos = int(start_pos)
+    end_pos = int(end_pos)
+    x = np.arange(start_pos, end_pos+1) / 1e6
+
+    if order is not None:
+        labels = order
+    elif tracks_dict is not None:
+        labels = list(tracks_dict.keys())
+
+    if isinstance(tracks_dict, dict):
+        #maxv = np.max([np.max(tracks_dict[k]) for k in labels])
+        for k, label in enumerate(labels):
+            c = tracks_dict[label]
+            y0 = (ntracks-1-k) * np.ones(len(x))  # vertical offset
+            # if label in track_colors:
+            #     color = track_colors[label]
+            # else:
+            #     color = 'k'
+            # ax.fill_between(x, 0.8*c/np.nanmax(c)+y0, y0,
+            # ax.fill_between(x, 0.8*c/15+y0, y0,
+            maxv = np.max(c)
+            ax.fill_between(x, 0.9*c/maxv + y0, y0,
+                            antialiased=False, linewidth=1, facecolor=track_colors.get(label, 'k'),
+                            clip_on=False, rasterized=True)
+
+        ax.set_yticks(np.arange(ntracks))
+        ax.set_yticklabels(labels[::-1], fontsize=8, va='bottom')
+        ax.spines['left'].set_bounds((0, ntracks-1))
+        ax.spines['left'].set_position(('outward', 6))
+        format_plot(ax, fontsize=8, hide=['top', 'right', 'bottom'], y_offset=6)
+        ax.set_ylim([-0.5, ntracks-0.5])
+
+    elif isinstance(tracks_dict, pd.DataFrame):  # plot as heatmap
+        ax.invert_yaxis()
+        ax.imshow(np.log10(tracks_dict.values.T),
+                  #extent=(),
+                  aspect='auto', interpolation='none')
+        ax2 = fig.add_axes([(dl-0.2)/fw, (db+ldh+ds0+gh+ds+ph+ds)/fh, 0.1/fw, ah/fh], sharey=ax)
+        # format_plot(ax, fontsize=8, hide=['top', 'right', 'bottom', 'left'])
+        format_plot(ax2, fontsize=8, hide=['top', 'right', 'bottom', 'left'])
+        ax2.set_xticks([])
+
+        cohort_index_dict = {i:k for k,i in enumerate(np.unique(coverage_cat))}
+        # if cohort_colors is None:
+        n = len(cohort_index_dict)
+        cmap = ListedColormap(plt.cm.get_cmap('Spectral', n)(np.arange(n)), 'indexed')
+        # else:
+        #     cmap = ListedColormap(np.stack(pd.Series(cohort_index_dict).sort_values().index.map(cohort_colors)))
+
+        # if orientation == 'vertical':
+        ax2.imshow(coverage_cat.map(cohort_index_dict).values.reshape(-1,1), aspect='auto', cmap=cmap)
+        # else:
+        #     ax.imshow(cohort_s.map(cohort_index_dict).values.reshape(1,-1), aspect='auto', cmap=cmap)
+        #
+        # if lax is None:
+        #     lax = ax
+        for k,i in cohort_index_dict.items():
+            ax.scatter([], [], marker='s', c=[cmap(i)], label=f'{k}')
+        # if legend:
+        ax.legend(loc='upper right', borderaxespad=None, bbox_to_anchor=(-0.05,1), handlelength=1, title='Taxonomy', fontsize=8)
+        ax.set_ylim([ntracks-0.5, -0.5])
+        ax.set_yticks([])
+
+    if tracks_dict is not None:
+        plt.setp(ax.get_xticklabels(), visible=False)
+    axes[0].set_xlim([x[0], x[-1]])
+
+    if pip_df is not None:
+        if pip_order is None:
+            pip_order = pip_df['trait_category'].unique()
+        i = 0
+        traits = []
+        for category_id in pip_order:
+            cdf = pip_df[pip_df['trait_category'] == category_id]
+            for i,(trait_id,gdf) in enumerate(cdf.groupby('trait_id'), i+1):
+                traits.append(trait_id)
+                fax.scatter(gdf['position']/1e6, [i-1]*gdf.shape[0],
+                           s=gdf['pip']*30, color=pip_colors[category_id], edgecolor='none')
+            if cdf.shape[0] > 0:
+                fax.scatter([],[],s=20, color=pip_colors[category_id], label=category_id, edgecolor='none')
+        fax.invert_yaxis()
+        fax.set_yticks(np.arange(len(traits)))
+
+        fax.spines['bottom'].set_visible(False)
+        fax.spines['top'].set_visible(False)
+        fax.spines['left'].set_position(('outward', 6))
+        fax.spines['left'].set_bounds((0, i-1))
+        fax.spines['right'].set_visible(False)
+        fax.set_xlim([x[0], x[-1]])
+        fax.set_yticklabels(traits, fontsize=7)
+        plt.setp(fax.get_xticklabels(), visible=False)
+        for line in fax.xaxis.get_ticklines():
+            line.set_markersize(0)
+            line.set_markeredgewidth(0)
+
+        if pip_legend:
+            fax.legend(loc='upper left', borderaxespad=0, bbox_to_anchor=(1.01,1), fontsize=8, handlelength=0.75, labelspacing=0)
+
+    if gene is not None:
+        for k,g in enumerate(gene[::-1]):
+            g.plot(ax=gax, max_intron=1e9, fc='k', ec='none', yoffset=k, scale=0.33, clip_on=True)
+            gax.annotate(g.name, (g.end_pos, k),
+                         xytext=(5,0), textcoords='offset points',
+                         va='center', ha='left', fontsize=10)
+        xlim = np.array([x[0], x[-1]])*1e6
+        gax.set_xlim(xlim)
+        gax.set_xticks([])
+        gax.set_yticks([])
+        gax.spines['bottom'].set_visible(False)
+        gax.spines['top'].set_visible(False)
+        gax.spines['left'].set_visible(False)
+        gax.spines['right'].set_visible(False)
+
+    if ld_df is not None:
+        format_plot(lax, fontsize=10)
+        plot_ld(ld_df, cmap=plt.cm.Greys, s=ld_marker_size, clip_on=True, yscale=aw/ldh, ax=lax)
+
+    axes[-1].set_xlabel('Position on {} (Mb)'.format(chrom), fontsize=12)
+
+    return axes
 
 
 def plot_effects(dfs, args, ax=None,
