@@ -4,6 +4,7 @@ import json
 import urllib
 import ssl
 from collections.abc import Iterable
+from matplotlib.colors import hsv_to_rgb, to_hex
 
 
 def s2d(x):
