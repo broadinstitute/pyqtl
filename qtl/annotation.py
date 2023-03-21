@@ -166,9 +166,15 @@ class Transcript(object):
         cds_coords = []
         for e in self.exons:
             if hasattr(e, 'CDS'):
-                cds_coords.extend(np.arange(e.CDS[0], e.CDS[1]+1))
+                c = np.arange(e.CDS[0], e.CDS[1]+1)
+                if self.gene.strand == '-':
+                    c = c[::-1]
+                cds_coords.extend(c)
         if cds_coords and include_stop:
-            cds_coords.extend(self.stop_codon)
+            c = self.stop_codon
+            if self.gene.strand == '-':
+                c = c[::-1]
+            cds_coords.extend(c)
         return cds_coords
 
     def load_sequence(self, fasta):
