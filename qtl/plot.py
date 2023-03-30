@@ -55,7 +55,6 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
 #         ax.spines['top'].set_visible(False)
 #     ax.tick_params(axis='both', which='both', direction='out', labelsize=fontsize)
 
-
 def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
                x_offset=6, y_offset=6, margins=None,
                dl=0.5, aw=2, dx=0.75, dr=0.25,
@@ -104,6 +103,19 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
         return axes, cax
     else:
         return axes
+
+
+def hide_ticks(ax, axis='both'):
+    if axis in ['x', 'both']:
+        plt.setp(ax.get_xticklabels(), visible=False)
+        for line in ax.xaxis.get_ticklines():
+            line.set_markersize(0)
+            line.set_markeredgewidth(0)
+    if axis in ['y', 'both']:
+        plt.setp(ax.get_yticklabels(), visible=False)
+        for line in ax.yaxis.get_ticklines():
+            line.set_markersize(0)
+            line.set_markeredgewidth(0)
 
 
 def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
@@ -183,10 +195,10 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
         # only residualize the phenotype for plotting
         p = stats.residualize(p.copy(), covariates_df.loc[p.index])
 
-    eqtl_df = pd.concat([g, p], axis=1)
-    eqtl_df.columns = ['genotype', 'phenotype']
+    qtl_df = pd.concat([g, p], axis=1)
+    qtl_df.columns = ['genotype', 'phenotype']
     if label_s is not None:
-        eqtl_df = pd.concat([eqtl_df, label_s], axis=1, sort=False)
+        qtl_df = pd.concat([qtl_df, label_s], axis=1, sort=False)
 
     if ax is None:
         ax = setup_figure(2, 2, yspace=[0.75, 0.25])
@@ -194,16 +206,16 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
     ax.spines['left'].set_position(('outward', 4))
 
     if not normalized:
-        if split:
+        if split and label_s is not None:
             if split_colors is None:
                 split_colors = [
                     hsv_to_rgb([0.025, 1, 0.8]),
                     hsv_to_rgb([0.575, 1, 0.8])
                 ]
             pal = sns.color_palette(split_colors)
-            i = eqtl_df.columns[2]
-            sns.violinplot(x="genotype", y="phenotype", hue=i, hue_order=sorted(eqtl_df[i].unique()),
-                           data=eqtl_df, palette=pal, ax=ax, order=[0,1,2], scale='width', cut=0, dogde=False, linewidth=1, width=0.75)
+            i = qtl_df.columns[2]
+            sns.violinplot(x="genotype", y="phenotype", hue=i, hue_order=sorted(qtl_df[i].unique()),
+                           data=qtl_df, palette=pal, ax=ax, order=[0,1,2], scale='width', cut=0, dogde=False, linewidth=1, width=0.75)
             l = ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1), fontsize=8, handlelength=0.6, ncol=2, handletextpad=0.5, labelspacing=0.33)
             l.set_title(None)
         else:
@@ -211,7 +223,7 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
                 color,
             ]
             pal = sns.color_palette(colors)
-            sns.violinplot(x="genotype", y="phenotype", data=eqtl_df,
+            sns.violinplot(x="genotype", y="phenotype", data=qtl_df,
                            cut=0, palette=pal, ax=ax, order=[0,1,2])
     else:
         pass
@@ -233,33 +245,28 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
         ax.set_title(title, fontsize=12)#, pad=8)
 
     if variant_id is not None:
-        ref,alt = variant_id.split('_')[2:4]
+        ref, alt = variant_id.split('_')[2:4]
+        labels = [
+            f'{ref}/{ref}',
+            f'{ref}/{alt}',
+            f'{alt}/{alt}',
+        ]
+    else:
+        labels = [0, 1, 2]
+
+    if show_counts:
         if not split:
-            if show_counts:
-                gcounts = g.astype(int).value_counts()
-                ax.set_xticklabels([
-                    f'{ref}/{ref}\n({gcounts.get(0, 0)})',
-                    f'{ref}/{alt}\n({gcounts.get(1, 0)})',
-                    f'{alt}/{alt}\n({gcounts.get(2, 0)})',
-                ])
-            else:
-                ax.set_xticklabels([
-                    f'{ref}/{ref}',
-                    f'{ref}/{alt}',
-                    f'{alt}/{alt}',
-                ])
+            gcounts = g.astype(int).value_counts()
+            labels = [f"{v}\n{gcounts.get(k, 0)}" for k,v in enumerate(labels)]
         else:
-            var_s = eqtl_df[eqtl_df.columns[2]]
-            c = sorted(var_s.unique())
+            var_s = qtl_df[qtl_df.columns[2]]
+            c = np.unique(var_s)
             assert len(c) == 2
 
             gcounts1 = g[var_s == c[0]].value_counts().reindex(np.arange(3), fill_value=0)
             gcounts2 = g[var_s == c[1]].value_counts().reindex(np.arange(3), fill_value=0)
-            ax.set_xticklabels([
-                f'{ref}/{ref}\n({gcounts1[0]},{gcounts2[0]})',
-                f'{ref}/{alt}\n({gcounts1[1]},{gcounts2[1]})',
-                f'{alt}/{alt}\n({gcounts1[2]},{gcounts2[2]})',
-            ])
+            labels = [f"{v}\n({gcounts1[k]},{gcounts2[k]})" for k,v in enumerate(labels)]
+    ax.set_xticklabels(labels)
 
     if show_pval:
         ax.text(0.05, 1, f"P = {pval:.2g}", va='top', ha='left', transform=ax.transAxes, fontsize=11)
@@ -772,6 +779,8 @@ class CohortLabel(object):
             self.values_s = cohort_s.astype(str).map({j:i for i,j in enumerate(cohort_s.cat.categories)})
             if colors is not None:
                 self.cmap = ListedColormap(cohort_s.cat.categories.map(colors))
+            else:
+                raise NotImplementedError()
         else:
             self.values_s = cohort_s
 
@@ -912,9 +921,11 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
         # ax.set_xticklabels(ix, rotation=rotation, rotation_mode='anchor', fontsize=fontsize, ha=ha, va=va)
         ax.set_xticklabels(ix, rotation=90, fontsize=fontsize)
         ax.tick_params(axis='x', pad=0, length=2)
+        # ax.tick_params(axis='x', length=0)
     if show_ylabels:
         ax.set_yticks(np.arange(df.shape[0]))
         ax.set_yticklabels(iy, fontsize=fontsize)
+        # ax.tick_params(axis='y', length=0)
     # plot labels
     for k in range(nr):
         row_labels[k].plot(ax=lax[k], ix=iy, show_frame=True)
