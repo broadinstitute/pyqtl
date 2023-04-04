@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import scipy.stats as stats
 
 
 class Residualizer(object):
@@ -76,10 +77,13 @@ def padjust_bh(p):
     i = np.arange(n,0,-1)
     o = np.argsort(p)[::-1]
     ro = np.argsort(o)
-    return np.minimum(1, np.minimum.accumulate(np.float(n)/i * np.array(p)[o]))[ro]
+    pa = np.minimum(1, np.minimum.accumulate(np.float(n)/i * np.array(p)[o]))[ro]
+    if isinstance(p, pd.Series):
+        pa = pd.Series(pa, index=p.index)
+    return pa
 
 
-def pi0est(p, lambda_qvalue):
+def pi0est(p, lambda_param):
     """
     pi0 statistic (Storey and Tibshirani, 2003)
 
@@ -88,25 +92,52 @@ def pi0est(p, lambda_qvalue):
     """
     if np.min(p) < 0 or np.max(p) > 1:
         raise ValueError("p-values not in valid range [0, 1]")
-    elif np.min(lambda_qvalue) < 0 or np.max(lambda_qvalue) >= 1:
+    elif np.min(lambda_param) < 0 or np.max(lambda_param) >= 1:
         raise ValueError("lambda must be within [0, 1)")
 
-    pi0 = np.mean(p >= lambda_qvalue) / (1 - lambda_qvalue)
+    pi0 = np.mean(p >= lambda_param) / (1 - lambda_param)
     pi0 = np.minimum(pi0, 1)
 
-    if pi0<=0:
+    if pi0 <= 0:
         raise ValueError("The estimated pi0 <= 0. Check that you have valid p-values or use a different range of lambda.")
 
     return pi0
 
 
-def bootstrap_pi1(pval, lambda_qvalue=0.5, bounds=[2.5, 97.5], n=1000):
+def qvalue(p, lambda_param=0.5, pi0=None):
+    """
+    q-value calculation for fixed 'lambda' from Storey and Tibshirani, 2003.
+    """
+    if isinstance(p, pd.Series):
+        ix = p.index
+        p = p.values
+    else:
+        ix = None
+
+    if pi0 is None:
+        pi0 = pi0est(p, lambda_param)
+
+    u = np.argsort(p)
+    m = len(p)
+    v = stats.rankdata(p, method='max')  # sort p
+    qvals = (pi0 * m * p)/v
+
+    qvals[u[m-1]] = np.minimum(qvals[u[m-1]], 1)
+    for i in range(m-2, -1, -1):
+        qvals[u[i]] = np.minimum(qvals[u[i]], qvals[u[i+1]])
+
+    if ix is not None:
+        qvals = pd.Series(qvals, index=ix)
+    return qvals
+
+
+def bootstrap_pi1(pval, lambda_param=0.5, bounds=[2.5, 97.5], n=1000):
     """Compute confidence intervals for pi1 with bootstrapping"""
     pi1_boot = []
     nfail = 0
     for _ in range(n):
         try:
-            pi1_boot.append(1 - pi0est(np.random.choice(pval, len(pval), replace=True), lambda_qvalue=lambda_qvalue))
+            pi1_boot.append(1 - pi0est(np.random.choice(pval, len(pval), replace=True), lambda_param=lambda_param))
         except:
             nfail += 1
     if nfail > 0:
