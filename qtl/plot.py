@@ -239,10 +239,9 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
     ax.set_xlim([-0.5,2.5])
     ax.spines['bottom'].set_bounds([0, 2])
     ax.yaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=5, nbins=5))
-    # ax.yaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=3, nbins=3))
 
     if title is not None:
-        ax.set_title(title, fontsize=12)#, pad=8)
+        ax.set_title(title, fontsize=12)
 
     if variant_id is not None:
         ref, alt = variant_id.split('_')[2:4]
@@ -826,7 +825,7 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
                origin='lower', dendrogram_pos='top', col_labels=None, row_labels=None,
                fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar_orientation='vertical',
                method='average', metric='euclidean', optimal_ordering=False, value_labels=False,
-               show_xlabels=False, show_ylabels=False, rotation=-45, ha='left', va='top',
+               show_xlabels=False, show_ylabels=False, tick_length=0, rotation=-45, ha='left', va='top',
                tri=False, rasterized=False,
                show_frame=False, dl=1, dr=1, dt=0.2, lh=0.1, ls=0.01,
                db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.175, dc=0.1, dtc=0):
@@ -918,14 +917,21 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
                   interpolation='none', rasterized=rasterized, aspect='auto')
     if show_xlabels:
         ax.set_xticks(np.arange(df.shape[1]))
-        # ax.set_xticklabels(ix, rotation=rotation, rotation_mode='anchor', fontsize=fontsize, ha=ha, va=va)
-        ax.set_xticklabels(ix, rotation=90, fontsize=fontsize)
-        ax.tick_params(axis='x', pad=0, length=2)
-        # ax.tick_params(axis='x', length=0)
+        if rotation != 90:
+            ax.set_xticklabels(ix, rotation=rotation, rotation_mode='anchor', ha=ha, va=va, fontsize=fontsize)
+        else:
+            ax.set_xticklabels(ix, rotation=90, fontsize=fontsize)
+        ax.tick_params(axis='x', length=tick_length)
+    else:
+        ax.set_xticks([])
+
     if show_ylabels:
         ax.set_yticks(np.arange(df.shape[0]))
         ax.set_yticklabels(iy, fontsize=fontsize)
-        # ax.tick_params(axis='y', length=0)
+        ax.tick_params(axis='y', length=tick_length)
+    else:
+        ax.set_yticks([])
+
     # plot labels
     for k in range(nr):
         row_labels[k].plot(ax=lax[k], ix=iy, show_frame=True)
