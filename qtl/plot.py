@@ -763,6 +763,9 @@ def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=10000
 class CohortLabel(object):
     def __init__(self, cohort_s, cmap=None, colors=None, label_pos='left', vmin=None, vmax=None, bad_color=None):
         assert cmap is not None or colors is not None
+        assert not cohort_s.index.duplicated().any()
+        if cohort_s.dtype == 'O':
+            cohort_s = cohort_s.astype('category')
         self.cohort_s = cohort_s
         if cmap is not None and bad_color is not None:
             cmap = copy.copy(cmap)
@@ -776,10 +779,11 @@ class CohortLabel(object):
         if cohort_s.dtype.name == 'category':
             # get numerical index
             self.values_s = cohort_s.astype(str).map({j:i for i,j in enumerate(cohort_s.cat.categories)})
-            if colors is not None:
-                self.cmap = ListedColormap(cohort_s.cat.categories.map(colors))
-            else:
-                raise NotImplementedError()
+            if colors is None:
+                n = len(cohort_s.cat.categories)
+                colors = cmap(np.linspace(0, 1, np.maximum(n, 5)))
+                colors = {k:v for k,v in zip(cohort_s.cat.categories, colors)}
+            self.cmap = ListedColormap(cohort_s.cat.categories.map(colors))
         else:
             self.values_s = cohort_s
 
@@ -800,7 +804,6 @@ class CohortLabel(object):
             x = x.reshape(1, -1)
         else:
             x = x.reshape(-1, 1)
-
         h = ax.imshow(x, aspect='auto', cmap=self.cmap, interpolation='none', origin='lower')
         if width > height:
             if self.label_pos == 'left':
@@ -871,7 +874,10 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
         # dendrogram
         dax = fig.add_axes([dl2/fw,         (db+ah+nc*(ls+lh)+ds)/fh, aw/fw, dd/fh])
         # colorbar
-        cax = fig.add_axes([(dl2+aw+dc)/fw, (db+ah-ch-dtc)/fh, cw/fw, ch/fh])
+        if colorbar_orientation == 'vertical':
+            cax = fig.add_axes([(dl2+aw+dc)/fw, (db+ah-ch-dtc)/fh, cw/fw, ch/fh])
+        else:
+            cax = fig.add_axes([(dl2+aw-ch-dtc)/fw, (db-cw-dc)/fh, ch/fw, cw/fh])
         axes = [ax, *lax, *tax, dax, cax]
     else:
         dax = fig.add_axes([dl/fw, db/fh, aw/fw, dd/fh])
@@ -967,7 +973,7 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
     # plot colorbar
     cbar = plt.colorbar(h, cax=cax, orientation=colorbar_orientation)
     cax.locator_params(nbins=4)
-    cbar.set_label(clabel, fontsize=cfontsize+2)
+    cbar.set_label(clabel, fontsize=cfontsize+1)
     cax.tick_params(labelsize=cfontsize)
 
     if not show_frame:
