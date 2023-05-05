@@ -192,9 +192,12 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
 
     if pileup_dfs[0].shape[1] <= 3:
         custom_cycler = cycler('color', [
-            hsv_to_rgb([0.55, 0.75, 0.8]),  #(0.2, 0.65, 0.8),  # blue
-            hsv_to_rgb([0.08, 1, 1]),  #(1.0, 0.5, 0.0),   # orange
-            hsv_to_rgb([0.3, 0.7, 0.7]),  #(0.2, 0.6, 0.17),  # green
+            # hsv_to_rgb([0.55, 0.75, 0.8]),  #(0.2, 0.65, 0.8),  # blue
+            # hsv_to_rgb([0.08, 1, 1]),  #(1.0, 0.5, 0.0),   # orange
+            # hsv_to_rgb([0.3, 0.7, 0.7]),  #(0.2, 0.6, 0.17),  # green
+            '#0374B3',  # blue
+            '#C84646',  # red
+            '#C69B3A',  # gold
         ])
     else:
         custom_cycler = None
@@ -256,7 +259,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         line.set_linewidth(1)
 
     if variant_id is not None and title is None:
-        axv[-1].set_title(f'{gene.name} :: {variant_id}', fontsize=11)
+        axv[-1].set_title(f"{gene.name} :: {variant_id.split('_b')[0].replace('_',':',1).replace('_','-')}", fontsize=11)
     else:
         axv[-1].set_title(title, fontsize=11)
 
