@@ -923,11 +923,13 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
                   interpolation='none', rasterized=rasterized, aspect='auto')
     if show_xlabels:
         ax.set_xticks(np.arange(df.shape[1]))
-        if rotation != 90:
+        if rotation not in [90, -90]:
             ax.set_xticklabels(ix, rotation=rotation, rotation_mode='anchor', ha=ha, va=va, fontsize=fontsize)
         else:
-            ax.set_xticklabels(ix, rotation=90, fontsize=fontsize)
+            ax.set_xticklabels(ix, rotation=rotation, ha=ha, va=va, fontsize=fontsize)
         ax.tick_params(axis='x', length=tick_length)
+        if show_xlabels == 'top':
+            ax.tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
     else:
         ax.set_xticks([])
 
@@ -955,13 +957,15 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
     # else:
     #     ax.xaxis.tick_top()
 
-    if label_colors is not None:  # plot label dots at bottom
+    if label_colors is not None:  # plot color legend
         s = 1.015
-        # xlim = ax.get_xlim()
-        # b = xlim[1] - s*np.diff(xlim)
-        # ax.set_xlim(xlim)
-        # ax.scatter([b]*df.shape[1], np.arange(df.shape[1]), s=48, c=label_colors[hierarchy.leaves_list(Zx)], clip_on=False)
-        # ax.tick_params(axis='y', pad=12)
+        xlim = ax.get_xlim()
+        b = xlim[1] - s*np.diff(xlim)
+        ax.set_xlim(xlim)
+        ax.scatter([b]*df.shape[1], np.arange(df.shape[1]), s=40, c=label_colors[hierarchy.leaves_list(Zx)], clip_on=False)
+        ax.set_yticks(np.arange(df.shape[0]))
+        ax.set_yticklabels(iy, fontsize=fontsize)
+        ax.tick_params(axis='y', pad=12, length=0)
 
         # s = 1.02
         # ylim = ax.get_ylim()
