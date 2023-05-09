@@ -826,7 +826,7 @@ class CohortLabel(object):
 
 def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.Blues,
                origin='lower', dendrogram_pos='top', col_labels=None, row_labels=None,
-               fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar_orientation='vertical',
+               fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar=True, colorbar_orientation='vertical',
                method='average', metric='euclidean', optimal_ordering=False, value_labels=False,
                show_xlabels=False, show_ylabels=False, tick_length=0, rotation=-45, ha='left', va='top',
                tri=False, rasterized=False,
@@ -873,17 +873,21 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
             )
         # dendrogram
         dax = fig.add_axes([dl2/fw,         (db+ah+nc*(ls+lh)+ds)/fh, aw/fw, dd/fh])
+        axes = [ax, *lax, *tax, dax]
         # colorbar
-        if colorbar_orientation == 'vertical':
-            cax = fig.add_axes([(dl2+aw+dc)/fw, (db+ah-ch-dtc)/fh, cw/fw, ch/fh])
-        else:
-            cax = fig.add_axes([(dl2+aw-ch-dtc)/fw, (db-cw-dc)/fh, ch/fw, cw/fh])
-        axes = [ax, *lax, *tax, dax, cax]
+        if colorbar:
+            if colorbar_orientation == 'vertical':
+                cax = fig.add_axes([(dl2+aw+dc)/fw, (db+ah-ch-dtc)/fh, cw/fw, ch/fh])
+            else:
+                cax = fig.add_axes([(dl2+aw-ch-dtc)/fw, (db-cw-dc)/fh, ch/fw, cw/fh])
+            axes.append(cax)
     else:
         dax = fig.add_axes([dl/fw, db/fh, aw/fw, dd/fh])
         ax =  fig.add_axes([dl/fw, (db+dd+ds)/fh, aw/fw, ah/fh])
-        cax = fig.add_axes([(dl+aw+dc)/fw, (db+dd+ds)/fh, cw/fw, ch/fh])
-        axes = [ax, dax, cax]
+        axes = [ax, dax]
+        if colorbar:
+            cax = fig.add_axes([(dl+aw+dc)/fw, (db+dd+ds)/fh, cw/fw, ch/fh])
+            axes.append(cax)
 
     if Zx is not None:
         with plt.rc_context({'lines.linewidth': lw}):
@@ -975,10 +979,11 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
         # ax.tick_params(axis='x', pad=12)
 
     # plot colorbar
-    cbar = plt.colorbar(h, cax=cax, orientation=colorbar_orientation)
-    cax.locator_params(nbins=4)
-    cbar.set_label(clabel, fontsize=cfontsize+1)
-    cax.tick_params(labelsize=cfontsize)
+    if colorbar:
+        cbar = plt.colorbar(h, cax=cax, orientation=colorbar_orientation)
+        cax.locator_params(nbins=4)
+        cbar.set_label(clabel, fontsize=cfontsize+1)
+        cax.tick_params(labelsize=cfontsize)
 
     if not show_frame:
         for i in ['left', 'top', 'right', 'bottom']:
