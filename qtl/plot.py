@@ -775,6 +775,7 @@ class CohortLabel(object):
         self.vmax = vmax
         self.name = cohort_s.name
         self.label_pos = label_pos
+        self.colors = colors
 
         if cohort_s.dtype.name == 'category':
             # get numerical index
@@ -782,8 +783,8 @@ class CohortLabel(object):
             if colors is None:
                 n = len(cohort_s.cat.categories)
                 colors = cmap(np.linspace(0, 1, np.maximum(n, 5)))
-                colors = {k:v for k,v in zip(cohort_s.cat.categories, colors)}
-            self.cmap = ListedColormap(cohort_s.cat.categories.map(colors))
+                self.colors = {k:v for k,v in zip(cohort_s.cat.categories, colors)}
+            self.cmap = ListedColormap(cohort_s.cat.categories.map(self.colors))
         else:
             self.values_s = cohort_s
 
@@ -823,8 +824,13 @@ class CohortLabel(object):
             line.set_markersize(0)
             line.set_markeredgewidth(0)
 
+        # prepare legend
+        if self.cohort_s.dtype.name == 'category':
+            for c in self.cohort_s.cat.categories:
+                ax.scatter([], [], c=[self.colors[c]], label=c, s=30, marker='s')
 
-def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.Blues,
+
+def clustermap(df, Zx=None, Zy=None, cluster=True, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.Blues,
                origin='lower', dendrogram_pos='top', col_labels=None, row_labels=None,
                fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar=True, colorbar_orientation='vertical',
                method='average', metric='euclidean', optimal_ordering=False, value_labels=False,
@@ -847,10 +853,10 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
     col_labels, nc = check_labels(col_labels)
     row_labels, nr = check_labels(row_labels)
 
-    if Zx is None:
+    if Zx is None and cluster:
         Zx = hierarchy.linkage(df.T, method=method, metric=metric, optimal_ordering=optimal_ordering)
         Zy = hierarchy.linkage(df,   method=method, metric=metric, optimal_ordering=optimal_ordering)
-    elif Zy is None:
+    elif Zy is None and cluster:
         Zy = Zx
 
     fw = dl + aw + dr + nr*(lh+ls)
@@ -893,6 +899,7 @@ def clustermap(df, Zx=None, Zy=None, aw=3, ah=3, lw=1, vmin=None, vmax=None, cma
         with plt.rc_context({'lines.linewidth': lw}):
             z = hierarchy.dendrogram(Zx, ax=dax,  orientation='top', link_color_func=lambda k: 'k')
         ix = df.columns[hierarchy.leaves_list(Zx)]
+        # ix = df.columns[z['leaves']]
     else:
         ix = df.columns
     dax.axis('off')
