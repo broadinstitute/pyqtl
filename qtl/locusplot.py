@@ -375,9 +375,10 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
             # if minp < -np.log10(pval_df['pval_nominal'].min())*0.8:
                 txt.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
 
-    for k,ax in enumerate(axes):
         ax.margins(y=0.2)
-        if ymax is None:
+        if 'pip' in pval_df:
+            ax.set_ylim([0, ax.get_ylim()[1]])
+        elif ymax is None:
             ax.set_ylim([0, np.maximum(ax.get_ylim()[1], miny)])
         else:
             ax.set_ylim([0, ymax[k]])
