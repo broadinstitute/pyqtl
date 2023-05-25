@@ -77,7 +77,7 @@ def padjust_bh(p):
     i = np.arange(n,0,-1)
     o = np.argsort(p)[::-1]
     ro = np.argsort(o)
-    pa = np.minimum(1, np.minimum.accumulate(np.float(n)/i * np.array(p)[o]))[ro]
+    pa = np.minimum(1, np.minimum.accumulate(np.float64(n)/i * np.array(p)[o]))[ro]
     if isinstance(p, pd.Series):
         pa = pd.Series(pa, index=p.index)
     return pa
