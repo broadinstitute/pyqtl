@@ -8,10 +8,10 @@ import gzip
 def to_bgzip(df, path, header=True, float_format=None):
     """Write DataFrame to bgzip"""
     assert path.endswith('.gz')
-    bgzip = subprocess.Popen('bgzip -c > '+path, stdin=subprocess.PIPE, shell=True, encoding='utf8')
+    bgzip = subprocess.Popen(f"bgzip -c > {path}", stdin=subprocess.PIPE, shell=True, encoding='utf8')
     df.to_csv(bgzip.stdin, sep='\t', index=False, header=header, float_format=float_format)
     stdout, stderr = bgzip.communicate()
-    subprocess.check_call('tabix -f '+path, shell=True)
+    subprocess.check_call(f"tabix -f {path}", shell=True)
 
 
 def sort_bed(bed_df, inplace=True):
@@ -29,7 +29,7 @@ def sort_bed(bed_df, inplace=True):
 def write_bed(bed_df, output_name, header=True, float_format=None):
     """Write DataFrame to BED format"""
     if header:  
-        assert (bed_df.columns[0]=='chr' or bed_df.columns[0]=='#chr') and bed_df.columns[1]=='start' and bed_df.columns[2]=='end'
+        assert (bed_df.columns[0] == 'chr' or bed_df.columns[0] == '#chr') and bed_df.columns[1] == 'start' and bed_df.columns[2] == 'end'
         # header must be commented in BED format
         header = bed_df.columns.values.copy()
         header[0] = '#chr'
@@ -39,7 +39,7 @@ def write_bed(bed_df, output_name, header=True, float_format=None):
 def read_gct(gct_file, sample_ids=None, dtype=None, load_description=True, skiprows=2):
     """Load GCT as DataFrame"""
     if sample_ids is not None:
-        sample_ids = ['Name']+list(sample_ids)
+        sample_ids = ['Name'] + list(sample_ids)
 
     if gct_file.endswith('.gct.gz') or gct_file.endswith('.gct'):
         if dtype is not None:
@@ -62,11 +62,11 @@ def read_gct(gct_file, sample_ids=None, dtype=None, load_description=True, skipr
     return df
 
 
-def write_gct(df, gct_file, float_format='%.6g'):
+def write_gct(df, gct_file, float_format='%.6g', compresslevel=6):
     """Write DataFrame to GCT format"""
-    assert df.index.name=='Name' and df.columns[0]=='Description'
+    assert df.index.name == 'Name' and df.columns[0] == 'Description'
     if gct_file.endswith('.gct.gz'):
-        opener = gzip.open(gct_file, 'wt', compresslevel=6)
+        opener = gzip.open(gct_file, 'wt', compresslevel=compresslevel)
     else:
         opener = open(gct_file, 'w')
 
@@ -91,14 +91,14 @@ def gtf_to_tss_bed(annotation_gtf, feature='gene', exclude_chrs=[], phenotype_id
     with opener as gtf:
         for row in gtf:
             row = row.strip().split('\t')
-            if row[0][0]=='#' or row[2]!=feature: continue # skip header
+            if row[0][0] == '#' or row[2] != feature: continue # skip header
             chrom.append(row[0])
 
             # TSS: gene start (0-based coordinates for BED)
-            if row[6]=='+':
+            if row[6] == '+':
                 start.append(np.int64(row[3])-1)
                 end.append(np.int64(row[3]))
-            elif row[6]=='-':
+            elif row[6] == '-':
                 start.append(np.int64(row[4])-1)  # last base of gene
                 end.append(np.int64(row[4]))
             else:
@@ -115,9 +115,9 @@ def gtf_to_tss_bed(annotation_gtf, feature='gene', exclude_chrs=[], phenotype_id
             gene_id.append(attributes['gene_id'])
             gene_name.append(attributes['gene_name'])
 
-    if phenotype_id=='gene_id':
+    if phenotype_id == 'gene_id':
         bed_df = pd.DataFrame(data={'chr':chrom, 'start':start, 'end':end, 'gene_id':gene_id}, columns=['chr', 'start', 'end', 'gene_id'], index=gene_id)
-    elif phenotype_id=='gene_name':
+    elif phenotype_id == 'gene_name':
         bed_df = pd.DataFrame(data={'chr':chrom, 'start':start, 'end':end, 'gene_id':gene_name}, columns=['chr', 'start', 'end', 'gene_id'], index=gene_name)
     # drop rows corresponding to excluded chromosomes
     mask = np.ones(len(chrom), dtype=bool)
