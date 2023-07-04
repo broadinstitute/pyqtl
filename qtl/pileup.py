@@ -48,7 +48,7 @@ def _samtools_depth_wrapper(args):
     return df[sample_id].astype(np.int32)
 
 
-def samtools_depth(region_str, bam_s, bam_index_dir=None, d=100000, num_threads=12, user_project=None):
+def samtools_depth(region_str, bam_s, bam_index_dir=None, d=100000, num_threads=12, user_project=None, verbose=True):
     """
       region_str: string in 'chr:start-end' format
       bam_s: pd.Series or dict mapping sample_id->bam_path
@@ -57,9 +57,9 @@ def samtools_depth(region_str, bam_s, bam_index_dir=None, d=100000, num_threads=
     pileups_df = []
     with mp.Pool(processes=num_threads) as pool:
         for k,r in enumerate(pool.imap(_samtools_depth_wrapper, [(i,region_str,j,bam_index_dir,d,user_project) for j,i in bam_s.items()]), 1):
-            print(f'\r  * running samtools depth on region {region_str} for bam {k}/{len(bam_s)}', end='')
+            if verbose:
+                print(f'\r  * running samtools depth on region {region_str} for bam {k}/{len(bam_s)}', end='' if k < len(bam_s) else None)
             pileups_df.append(r)
-        print()
     pileups_df = pd.concat(pileups_df, axis=1)
     pileups_df.index.name = 'position'
     return pileups_df
