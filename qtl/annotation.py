@@ -115,22 +115,22 @@ class Exon(object):
         return self.length
 
     def __eq__(self, other):
-        return (self.start_pos, self.end_pos)==(other.start_pos, other.end_pos)
+        return (self.start_pos, self.end_pos) == (other.start_pos, other.end_pos)
 
     def __lt__(self, other):
-        return self.start_pos<other.start_pos or (self.start_pos==other.start_pos and self.end_pos<other.end_pos)
+        return self.start_pos < other.start_pos or (self.start_pos == other.start_pos and self.end_pos < other.end_pos)
 
     def __gt__(self, other):
-        return self.start_pos>other.start_pos or (self.start_pos==other.start_pos and self.end_pos>other.end_pos)
+        return self.start_pos > other.start_pos or (self.start_pos == other.start_pos and self.end_pos > other.end_pos)
 
     def __le__(self, other):
-        return self.start_pos<other.start_pos or (self.start_pos==other.start_pos and self.end_pos<=other.end_pos)
+        return self.start_pos < other.start_pos or (self.start_pos == other.start_pos and self.end_pos <= other.end_pos)
 
     def __ge__(self, other):
-        return self.start_pos>other.start_pos or (self.start_pos==other.start_pos and self.end_pos>=other.end_pos)
+        return self.start_pos > other.start_pos or (self.start_pos == other.start_pos and self.end_pos >= other.end_pos)
 
     def __ne__(self, other):
-        return self.start_pos!=other.start_pos or self.end_pos!=other.end_pos
+        return self.start_pos != other.start_pos or self.end_pos != other.end_pos
 
 
 class Transcript(object):
@@ -151,7 +151,7 @@ class Transcript(object):
     def __str__(self, ref=1):
         """Print text representation of transcript structure"""
         rep = [f'Transcript: {self.id} ({self.name}): {self.type}' +\
-            f'; pos.: {self.start_pos-ref+1:d}-{self.end_pos-ref+1:d}' +\
+            f'; {self.gene.chr}:{self.start_pos-ref+1:d}-{self.end_pos-ref+1:d} ({self.gene.strand})' +\
             f'; length: {sum([e.length for e in self.exons]):d}']
         rep += ['    '+i.__str__(ref) for i in self.exons]
         return '\n'.join(rep)
@@ -161,32 +161,64 @@ class Transcript(object):
                 len(self.exons) == len(other.exons) and
                 np.all([i == j for i,j in zip(self.exons, other.exons)]))
 
+    def get_cds_ranges(self, include_stop=True):
+        cds_ranges = [e.CDS for e in self.exons if hasattr(e, 'CDS')]
+        if cds_ranges and include_stop:
+            cds_ranges.append(self.stop_codon[::2])
+        return cds_ranges
+
     def get_cds_coords(self, include_stop=True):
         """Get genomic coordinates of coding sequence, including stop codon."""
-        cds_coords = []
-        for e in self.exons:
-            if hasattr(e, 'CDS'):
-                c = np.arange(e.CDS[0], e.CDS[1]+1)
-                if self.gene.strand == '-':
-                    c = c[::-1]
-                cds_coords.extend(c)
-        if cds_coords and include_stop:
-            c = self.stop_codon
-            if self.gene.strand == '-':
-                c = c[::-1]
-            cds_coords.extend(c)
-        return cds_coords
+        cds_ranges = self.get_cds_ranges(include_stop=include_stop)
+        if self.gene.strand == '+':
+            return np.concatenate([np.arange(r[0], r[1]+1) for r in cds_ranges])
+        else:
+            return np.concatenate([np.arange(r[1], r[0]-1, -1) for r in cds_ranges])
 
-    def load_sequence(self, fasta):
-        """Load transcript sequence from FASTA"""
-        region_strs = [f'{self.gene.chr}:{e.start_pos}-{e.end_pos}' for e in self.exons]
-        if self.gene.strand == '-':
-            region_strs = region_strs[::-1]
-        s = get_sequence(fasta, region_strs, concat=True)
+    def get_sequence(self, feature='all', fasta=None, include_stop=False):
+        """Load transcript sequence from FASTA file"""
+        if fasta is not None:
+            region_strs = [f'{self.gene.chr}:{e.start_pos}-{e.end_pos}' for e in self.exons]
+            if self.gene.strand == '-':
+                region_strs = region_strs[::-1]
+            s = get_sequence(fasta, region_strs, concat=True)
+        elif hasattr(self.gene, 'annotation') and self.gene.annotation.fasta_dict is not None:
+            if feature.lower() == 'all':
+                s = [self.gene.annotation.fasta_dict[self.gene.chr][e.start_pos-1:e.end_pos] for e in self.exons]
+                if self.gene.strand == '-':
+                    s = s[::-1]
+                s = ''.join(s)
+            elif feature.lower() == 'utr3':
+                if len(self.utr3) > 0:
+                    s = [self.gene.annotation.fasta_dict[self.gene.chr][r[0]-1:r[1]] for r in self.utr3]
+                    if self.gene.strand == '-':
+                        s = s[::-1]
+                    s = ''.join(s)
+                else:
+                    return None
+            elif feature.lower() == 'utr5':
+                if len(self.utr5) > 0:
+                    s = [self.gene.annotation.fasta_dict[self.gene.chr][r[0]-1:r[1]] for r in self.utr5]
+                    if self.gene.strand == '-':
+                        s = s[::-1]
+                    s = ''.join(s)
+                else:
+                    return None
+            elif feature.lower() == 'cds':
+                cds_ranges = self.get_cds_ranges(include_stop=include_stop)
+                s = [self.gene.annotation.fasta_dict[self.gene.chr][r[0]-1:r[1]] for r in cds_ranges]
+                if self.gene.strand == '-':
+                    s = s[::-1]
+                s = ''.join(s)
+            else:
+                raise ValueError('Unsupported feature. Options: all, cds, utr5, utr3.')
+        else:
+            raise ValueError('Reference genome FASTA must either be loaded with annotation.load_fasta() or provided as input.')
+
         if self.gene.strand == '-':
             s = reverse_complement(s)
-        self.seq = s
 
+        return s
 
 class Gene(object):
     def __init__(self, gene_id, gene_name, gene_type, chrom, strand, start_pos, end_pos, transcript_list=None):
@@ -211,7 +243,7 @@ class Gene(object):
         """Print gene/isoform structure"""
         rep = f'Gene: {self.name} ({self.id}): {self.type}; ' +\
              f"{self.chr}:{self.start_pos-ref+1:d}-{self.end_pos-ref+1:d} ({self.strand})"
-        if len(self.transcripts)>1:
+        if len(self.transcripts) > 1:
             rep = rep + f'; {len(self.transcripts)} isoforms'
         if isinstance(self.mappability, float):
             rep = rep + f'; Mappability: {self.mappability:.4f}'
@@ -563,6 +595,7 @@ class Annotation(object):
         self.gene_ids = []
         self.gene_names = []
         self.header = []
+        self.fasta_dict = None
 
         if isinstance(varin, list):
             self.genes = varin
@@ -693,16 +726,24 @@ class Annotation(object):
         self.gene_interval_trees = defaultdict(IntervalTree)
         for g in self.genes:
             self.gene_interval_trees[g.chr].add(g.start_pos, g.end_pos+1, g)
-
-        # calculate transcript lenghts
-        for g in self.genes:
+            # add transcript lenghts
             for t in g.transcripts:
                 t.length = sum([e.length for e in t.exons])
+            # add annotation
+            g.annotation = self
 
         self.add_biotype()
 
 
+    def load_fasta(self, fasta_file):
+        with open(fasta_file) as f:
+            s = f.read().strip()
+        s = [i.split('\n', 1) for i in s.split('>')[1:]]
+        self.fasta_dict = {i[0].split()[0]:i[1].replace('\n','') for i in s}
+
+
     def query_genes(self, region_str):
+        """Find genes overlapping region defined as chr:start-end"""
         chrom, pos = region_str.split(':')
         pos = [int(i) for i in pos.split('-')]
         if len(pos) == 2:
@@ -825,7 +866,7 @@ class Annotation(object):
                         proj[e.start_pos-g.start_pos:e.end_pos-g.start_pos+1] += 1
 
                 for t in g.transcripts:
-                    if len(t.exons)>2:
+                    if len(t.exons) > 2:
                         cand = np.zeros(len(t.exons), dtype=bool)
                         for (i,e) in enumerate(t.exons[1:-1]):
                             cand[i] = all(proj[e.start_pos-g.start_pos:e.end_pos-g.start_pos+1] == 1)
@@ -847,10 +888,10 @@ class Annotation(object):
             for t in g.transcripts:
                 for i in range(len(t.exons)-1):
                     if g.strand == '+':
-                        junctions.append([g.chr, t.exons[i].end_pos+1, t.exons[i+1].start_pos-1, g.id])
+                        junctions.append([g.chr, t.exons[i].end_pos+1, t.exons[i+1].start_pos-1, g.strand, g.id])
                     else:
-                        junctions.append([g.chr, t.exons[i+1].end_pos+1, t.exons[i].start_pos-1, g.id])
-        df = pd.DataFrame(junctions, columns=['chr', 'intron_start', 'intron_end', 'gene_id']).drop_duplicates()
+                        junctions.append([g.chr, t.exons[i+1].end_pos+1, t.exons[i].start_pos-1, g.strand, g.id])
+        df = pd.DataFrame(junctions, columns=['chr', 'intron_start', 'intron_end', 'strand', 'gene_id']).drop_duplicates()
         # sort within chrs
         df = df.groupby('chr', sort=False).apply(lambda x: x.sort_values(['intron_start', 'intron_end'])).reset_index(drop=True)
         return df
