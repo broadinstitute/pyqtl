@@ -35,28 +35,50 @@ def _samtools_depth_wrapper(args):
     For files on GCP, GCS_OAUTH_TOKEN must be set.
     This can be done with qtl.refresh_gcs_token().
     """
-    bam_file, region_str, sample_id, bam_index_dir, depth, user_project = args
+    bam_file, region_str, sample_id, bam_index_dir, flags, user_project = args
 
-    cmd = f"samtools depth -a -a -d {depth} -Q 255 -r {region_str} {bam_file}"
+    cmd = f"samtools depth {flags} -r {region_str} {bam_file}"
     if user_project is not None:
         cmd += f"?userProject={user_project}"
     with cd(bam_index_dir):
         c = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
 
     df = pd.DataFrame([i.split('\t') for i in c], columns=['chr', 'pos', sample_id])
-    df.index = df['chr']+'_'+df['pos']
+    df.index = df['chr'] + '_' + df['pos']
     return df[sample_id].astype(np.int32)
 
 
-def samtools_depth(region_str, bam_s, bam_index_dir=None, d=100000, num_threads=12, user_project=None, verbose=True):
+def samtools_depth(region_str, bam_s, bam_index_dir=None, flags='-aa -Q 255 -d 100000',
+                   num_threads=12, user_project=None, verbose=True):
     """
-      region_str: string in 'chr:start-end' format
-      bam_s: pd.Series or dict mapping sample_id->bam_path
-      bam_index_dir: directory containing local copies of the BAM/CRAM indexes
+    Run samtools depth for a list of BAMs.
+
+    Note: reads with the flags [UNMAP,SECONDARY,QCFAIL,DUP] are excluded by default;
+    see documentation for `samtools depth` and http://www.htslib.org/doc/samtools-flags.html
+
+    Parameters
+    ----------
+    region_str : str
+        Genomic region as 'chr:start-end'
+    bam_s : pd.Series or dict
+        sample_id -> bam_path
+    bam_index_dir: str
+        Directory already containing local copies of the BAM/CRAM indexes, or target directory
+    flags : str
+        Flags passed to samtools depth
+    num_threads : int
+        Number of threads
+    user_project : str
+        User project for GCP
+
+    Returns
+    -------
+    pileups_df : pd.DataFrame
+        DataFrame of pileups (samples in columns)
     """
     pileups_df = []
     with mp.Pool(processes=num_threads) as pool:
-        for k,r in enumerate(pool.imap(_samtools_depth_wrapper, [(i,region_str,j,bam_index_dir,d,user_project) for j,i in bam_s.items()]), 1):
+        for k,r in enumerate(pool.imap(_samtools_depth_wrapper, [(i,region_str,j,bam_index_dir,flags,user_project) for j,i in bam_s.items()]), 1):
             if verbose:
                 print(f'\r  * running samtools depth on region {region_str} for bam {k}/{len(bam_s)}', end='' if k < len(bam_s) else None)
             pileups_df.append(r)
