@@ -178,7 +178,23 @@ class Transcript(object):
     def get_sequence(self, feature='all', fasta=None, include_stop=False):
         """Load transcript sequence from FASTA file"""
         if fasta is not None:
-            region_strs = [f'{self.gene.chr}:{e.start_pos}-{e.end_pos}' for e in self.exons]
+            if feature.lower() == 'all':
+                region_strs = [f"{self.gene.chr}:{e.start_pos}-{e.end_pos}" for e in self.exons]
+            elif feature.lower() == 'utr3':
+                if len(self.utr3) > 0:
+                    region_strs = [f"{self.gene.chr}:{r[0]}-{r[1]}" for r in self.utr3]
+                else:
+                    return None
+            elif feature.lower() == 'utr5':
+                if len(self.utr5) > 0:
+                    region_strs = [f"{self.gene.chr}:{r[0]}-{r[1]}" for r in self.utr5]
+                else:
+                    return None
+            elif feature.lower() == 'cds':
+                cds_ranges = self.get_cds_ranges(include_stop=include_stop)
+                region_strs = [f"{self.gene.chr}:{r[0]}-{r[1]}" for r in cds_ranges]
+            else:
+                raise ValueError('Unsupported feature. Options: all, cds, utr5, utr3.')
             if self.gene.strand == '-':
                 region_strs = region_strs[::-1]
             s = get_sequence(fasta, region_strs, concat=True)
