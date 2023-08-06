@@ -1074,16 +1074,14 @@ class Annotation(object):
                                              '.', g.strand, '.', e.attributes_string])+'\n')
 
 
-    def write_bed(self, bed_path, name='transcript_id', add_attributes=True, overwrite=False):
+    def write_bed(self, bed_path, overwrite=False):
         """
-        BED format: chr, start, end, id/name, score (1000), strand, start, end, ., #exons, sizes, starts
-
-          attribute: use transcript 'id' or 'name'
-
-        Note: in collapsed model, transcript.id and transcript.name match gene.id and gene.name
+        Write to BED format.
+        Columns: chr, start, end, gff3_attributes (ID, name, biotype), score (1000), strand, thick_start, thick_end, ., #exons, sizes, starts
         """
         if not os.path.exists(bed_path) or overwrite:
             with open(bed_path, 'w') as bed:
+                bed.write('#gffTags\n')
                 for g in self.genes:
                     for t in g.transcripts:
                         # BED intervals: [...), 0-based
@@ -1096,19 +1094,25 @@ class Annotation(object):
                             exon_lengths = exon_lengths[::-1]
                             exon_starts = [str(e.start_pos - t.exons[-1].start_pos) for e in t.exons[::-1]]
 
-                        if name == 'transcript_id':
-                            tid = [t.id, t.name]
-                        elif name == 'transcript_name':
-                            tid = [t.name, t.id]
-                        elif name == 'gene_id':
-                            tid = [g.id, g.name]
-                        elif name == 'gene_name':
-                            tid = [g.name, g.id]
-                        s = [g.chr, start, end, tid[0], '1000', g.strand, start, end, '.',
+                        cds_ranges = [e.CDS for e in t.exons if hasattr(e, 'CDS')]
+                        if cds_ranges:
+                            if t.stop_codon:
+                                cds_ranges.append(t.stop_codon[::2])
+                            if g.strand == '+':
+                                thick_start = str(cds_ranges[0][0] - 1)
+                                thick_end = str(cds_ranges[-1][1])
+                            elif g.strand == '-':
+                                thick_start = str(cds_ranges[-1][0] - 1)
+                                thick_end = str(cds_ranges[0][1])
+                        else:
+                            thick_start = start
+                            thick_end = end
+
+                        attributes = f"ID={t.id};Name={t.name};Type={t.type};Parent={g.id}"
+
+                        s = [g.chr, start, end, attributes, '1000', g.strand, thick_start, thick_end, '.',
                             str(len(t.exons)),
-                            ','.join(exon_lengths)+',',
-                            ','.join(exon_starts)+',',
+                            ','.join(exon_lengths) + ',',
+                            ','.join(exon_starts) + ',',
                         ]
-                        if add_attributes:
-                            s += [tid[1]]
                         bed.write('\t'.join(s)+'\n')
