@@ -163,7 +163,7 @@ class Transcript(object):
 
     def get_cds_ranges(self, include_stop=True):
         cds_ranges = [e.CDS for e in self.exons if hasattr(e, 'CDS')]
-        if cds_ranges and include_stop:
+        if cds_ranges and include_stop and len(self.stop_codon) > 0:
             cds_ranges.append(self.stop_codon[::2])
         return cds_ranges
 
