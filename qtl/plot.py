@@ -30,19 +30,19 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
         fw += dx + mx
     if margin_axes in ['y', 'both']:
         fh += dy + my
-    fig = plt.figure(facecolor=None, figsize=(fw,fh))
-    axes = [fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh], facecolor='none')]
+    fig = plt.figure(facecolor='none', figsize=(fw,fh))
+    axes = [fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh], facecolor='none', zorder=1)]
     if margin_axes in ['y', 'both']:
-        axes.append(fig.add_axes([dl/fw, (db+ah+dy)/fh, aw/fw, my/fh], sharex=axes[0]))
+        axes.append(fig.add_axes([dl/fw, (db+ah+dy)/fh, aw/fw, my/fh], sharex=axes[0], facecolor='none', zorder=0))
     if margin_axes in ['x', 'both']:
-        axes.append(fig.add_axes([(dl+aw+dx)/fw, db/fh, mx/fw, ah/fh], sharey=axes[0]))
+        axes.append(fig.add_axes([(dl+aw+dx)/fw, db/fh, mx/fw, ah/fh], sharey=axes[0], facecolor='none', zorder=0))
         dl += aw + dx + mx + ds
     else:
         dl += aw + ds
     if colorbar:
         if ch is None:
             ch = 0.4*ah
-        axes.append(fig.add_axes([dl/fw, (db+ah-ch-ct)/fh, cw/fw, ch/fh]))
+        axes.append(fig.add_axes([dl/fw, (db+ah-ch-ct)/fh, cw/fw, ch/fh], facecolor='none'))
     if len(axes) == 1:
         axes = axes[0]
     return axes
@@ -180,7 +180,7 @@ def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
 
 def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=None, covariates_df=None,
             legend_text=None, show_pval=False, normalized=False, loc=None, ax=None, color=[0.5]*3,
-            variant_id=None, jitter=0, bvec=None, boxplot=False, xlabel=None,
+            variant_id=None, jitter=0, bvec=None, boxplot=False, xlabel=None, dr=0.25, dt=0.25, db=0.5, dl=0.75,
             ylabel='Normalized expression', title=None, show_counts=True):
     """"""
 
@@ -201,7 +201,7 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
         qtl_df = pd.concat([qtl_df, label_s], axis=1, sort=False)
 
     if ax is None:
-        ax = setup_figure(2, 2, yspace=[0.75, 0.25])
+        ax = setup_figure(2, 2, xspace=[dl, dr], yspace=[db, dt])
     ax.spines['bottom'].set_position(('outward', 4))
     ax.spines['left'].set_position(('outward', 4))
 
@@ -830,6 +830,18 @@ class CohortLabel(object):
                 ax.scatter([], [], c=[self.colors[c]], label=c, s=30, marker='s')
 
 
+def check_labels(labels):
+    if labels is not None:
+        if isinstance(labels, CohortLabel):
+            labels = [labels]
+        else:
+            assert all([isinstance(i, CohortLabel) for i in labels])
+        n = len(labels)
+    else:
+        n = 0
+    return labels, n
+
+
 def clustermap(df, Zx=None, Zy=None, cluster=True, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.Blues,
                origin='lower', dendrogram_pos='top', col_labels=None, row_labels=None,
                fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar=True, colorbar_orientation='vertical',
@@ -839,17 +851,6 @@ def clustermap(df, Zx=None, Zy=None, cluster=True, aw=3, ah=3, lw=1, vmin=None, 
                show_frame=False, dl=1, dr=1, dt=0.2, lh=0.1, ls=0.01,
                db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.175, dc=0.1, dtc=0):
     """"""
-    def check_labels(labels):
-        if labels is not None:
-            if isinstance(labels, CohortLabel):
-                labels = [labels]
-            else:
-                assert all([isinstance(i, CohortLabel) for i in labels])
-            n = len(labels)
-        else:
-            n = 0
-        return labels, n
-
     col_labels, nc = check_labels(col_labels)
     row_labels, nr = check_labels(row_labels)
 
