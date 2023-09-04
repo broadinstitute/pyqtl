@@ -177,7 +177,14 @@ def compute_ld(genotype_df, variant_id):
 
 def get_conditional_pvalues(group_df, genotypes, phenotype_df, covariates_df,
                             phenotype_id=None, window=200000, maf_threshold=0):
-    """"""
+    """
+    Compute conditional p-values for a set of variants defined in group_df
+
+    group_df : dataframe with columns 'variant_id' and 'phenotype_id'
+    genotypes : pd.DataFrame or qtl.genotype.GenotypeIndexer
+    phenotype_df : pd.DataFrame
+    covariates_df : pd.DataFrame
+    """
     assert phenotype_df.columns.equals(covariates_df.index)
     variant_id = group_df['variant_id'].iloc[0]
 

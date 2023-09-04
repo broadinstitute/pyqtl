@@ -180,13 +180,13 @@ def sdy_est(vbeta, maf, n):
 
 def abf(df1, df2, N=None, sdy=None, p1=1e-4, p2=1e-4, p12=1e-5, verbose=False):
     """
-    
+
     Args:
-      df1, df2: DataFrames with columns 
+      df1, df2: DataFrames with columns
                   'beta' and 'beta_se' -or-
                   'pval_nominal' and 'maf'
       N: sample size, must be provided if using p-values and MAF
-    
+
     """
 
     if 'sample_size' in df1:
@@ -222,11 +222,16 @@ def abf(df1, df2, N=None, sdy=None, p1=1e-4, p2=1e-4, p12=1e-5, verbose=False):
     return pp_abf, merged_df
 
 
-def susie(s1, s2, verbose=False):
+def susie(s1, s2, p1=1e-4, p2=1e-4, p12=5e-6, verbose=False, is_sorted=True):
     """
     Colocalisation with multiple causal variants using SuSiE
 
     s1, s2: outputs from SuSiE
+
+    Note: this function assumes that 'lbf_variable' are indexed by 'cs_index':
+      res['lbf_variable'] = res['lbf_variable'][res['sets']['cs_index']]
+    See tensorqtl.susie.map() for additional details.
+
     """
     cs1 = s1['sets']
     cs2 = s2['sets']
@@ -244,9 +249,17 @@ def susie(s1, s2, verbose=False):
         print(f"Using {n} shared variants (of {lbf1.shape[1]} and {lbf2.shape[1]})")
     idx1 = cs1['cs_index']
     idx2 = cs2['cs_index']
-    bf1 = lbf1.loc[idx1, isnps]
-    bf2 = lbf2.loc[idx2, isnps]
-    ret = bf_bf(bf1, bf2)
+    if not is_sorted:
+        bf1 = lbf1.loc[idx1, isnps]
+        bf2 = lbf2.loc[idx2, isnps]
+    else:
+        bf1 = lbf1[isnps]
+        bf2 = lbf2[isnps]
+
+    ret = bf_bf(bf1, bf2, p1=p1, p2=p2, p12=p12)
+
+    ret['summary']['idx1'] = idx1[ret['summary']['idx1']]
+    ret['summary']['idx2'] = idx2[ret['summary']['idx2']]
     # ret$summary[, `:=`(idx1, cs1$cs_index[idx1])]
     # ret$summary[, `:=`(idx2, cs2$cs_index[idx2])]
     return ret
@@ -296,7 +309,8 @@ def bf_bf(bf1, bf2, p1=1e-4, p2=1e-4, p12=5e-6, overlap_min=0.5, trim_by_posteri
     results = []
     PP = []
     for k in range(len(todo_df)):
-        df = pd.DataFrame({'snp': isnps, 'bf1': bf1.values[todo_df['i'][k]], 'bf2': bf2.values[todo_df['j'][k]]})
+        df = pd.DataFrame({'snp': isnps, 'bf1': bf1.values[todo_df['i'][k]].astype(np.float64),
+                           'bf2': bf2.values[todo_df['j'][k]].astype(np.float64)})
         df['internal_sum_lABF'] = df['bf1'] + df['bf2']
         df['snp_pp_h4'] =  np.exp(df['internal_sum_lABF'] - logsum(df['internal_sum_lABF']))
         pp_abf = combine_abf(df['bf1'], df['bf2'], p1, p2, p12, verbose=verbose)
