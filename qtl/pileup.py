@@ -5,12 +5,14 @@ import os
 import subprocess
 import contextlib
 import tempfile
+from collections.abc import Iterable
 import multiprocessing as mp
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.colors import hsv_to_rgb
 import seaborn as sns
 from cycler import cycler
+import pyBigWig
 
 from . import stats, annotation
 from . import plot as qtl_plot
@@ -44,7 +46,7 @@ def _samtools_depth_wrapper(args):
         c = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
 
     df = pd.DataFrame([i.split('\t') for i in c], columns=['chr', 'pos', sample_id])
-    df.index = df['chr'] + '_' + df['pos']
+    df.index = df['pos'].astype(np.int32)
     return df[sample_id].astype(np.int32)
 
 
@@ -176,7 +178,7 @@ def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=No
 
 
 def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive',
-         title=None, show_variant_pos=False, annot_track=None, max_intron=300, alpha=1, lw=0.5,
+         title=None, plot_variants=None, annot_track=None, max_intron=300, alpha=1, lw=0.5,
          highlight_introns=None, highlight_introns2=None, shade_range=None,
          ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
          dl=0.75, aw=4.5, dr=0.75, db=0.5, ah=1.5, dt=0.25, ds=0.2):
@@ -200,11 +202,11 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     if variant_id is not None:
         chrom, pos, ref, alt = variant_id.split('_')[:4]
         pos = int(pos)
-        if np.issubdtype(pileup_dfs[0].columns.dtype, np.integer):
+        if np.issubdtype(pileup_dfs[0].columns.dtype, np.integer):  # assume that inputs are genotypes
             gtlabels = np.array([
-                f'{ref}{ref}',
-                f'{ref}{alt}',
-                f'{alt}{alt}',
+                f'{ref}:{ref}',
+                f'{ref}:{alt}',
+                f'{alt}:{alt}',
             ])
         else:
             gtlabels = None
@@ -246,9 +248,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         sorder = s.index
 
     gene.set_plot_coords(max_intron=max_intron)
-    xi = gene.map_pos(np.arange(gene.start_pos, gene.end_pos+1))
-
     for k,ax in enumerate(axv):
+        xi = gene.map_pos(pileup_dfs[k].index)
         for i in sorder:
             if i in pileup_dfs[k]:
                 if outline:
@@ -285,9 +286,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     else:
         axv[-1].set_title(title, fontsize=11)
 
-    # highlight variant
-    if show_variant_pos and pos is not None and pos >= gene.start_pos and pos <= gene.end_pos:
-        x = gene.map_pos(pos)
+    # plot variant(s)
+    def _plot_variant(x):
         for ax in axv:
             xlim = np.diff(ax.get_xlim())[0]
             ylim = np.diff(ax.get_ylim())[0]
@@ -296,6 +296,18 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
             v = np.array([[x-b, -h-0.01*ylim], [x+b, -h-0.01*ylim], [x, -0.01*ylim]])
             ax.add_patch(patches.Polygon(v, closed=True, color='r', clip_on=False, zorder=10))
 
+    if isinstance(plot_variants, str):
+        x = gene.map_pos(int(plot_variants.split('_')[1]))
+        _plot_variant(x)
+    elif isinstance(plot_variants, Iterable):
+        for i in plot_variants:
+            x = gene.map_pos(int(i.split('_')[1]))
+            _plot_variant(x)
+    elif plot_variants == True and pos is not None:
+        x = gene.map_pos(pos)
+        _plot_variant(x)
+
+    # plot highlight/shading
     if shade_range is not None:
         if isinstance(shade_range, str):
             shade_range = shade_range.split(':')[-1].split('-')
@@ -319,7 +331,10 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     axv.append(gax)
 
     if mappability_bigwig is not None:  # add mappability
-        c = gene.get_coverage(mappability_bigwig)
+        xi = gene.map_pos(pileup_dfs[0].index)
+        # c = gene.get_coverage(mappability_bigwig)
+        with pyBigWig.open(mappability_bigwig) as bw:
+            c = bw.values(gene.chr, int(pileup_dfs[0].index[0]-1), int(pileup_dfs[0].index[-1]), numpy=True)
         mpax = fig.add_axes([dl/fw, 0.25/fh, aw/fw, da2/fh], sharex=axv[0])
         mpax.fill_between(xi, c, color=3*[0.6], lw=1, interpolate=False, rasterized=rasterized)
         for i in ['top', 'right']:

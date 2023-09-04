@@ -273,10 +273,9 @@ class Gene(object):
 
     def get_coverage(self, bigwig):
         """Returns coverage for the genomic region spanned by the gene"""
-        bw = pyBigWig.open(bigwig)
-        # pyBigWig returns values using BED intervals, e.g., in [start, end)
-        c = bw.values(self.chr, self.start_pos-1, self.end_pos, numpy=True)
-        bw.close()
+        with pyBigWig.open(bigwig) as bw:
+            # pyBigWig returns values using BED intervals, e.g., in [start, end)
+            c = bw.values(self.chr, self.start_pos-1, self.end_pos, numpy=True)
         return c
 
     def get_collapsed_coords(self, exclude_biotypes=[]):
@@ -316,7 +315,9 @@ class Gene(object):
     def set_plot_coords(self, max_intron=1000, exclude_biotypes=[], reference=None):
         """"""
         if reference is None:
-            reference = self.start_pos
+            self.reference = self.start_pos
+        else:
+            self.reference = reference
 
         # cumulative lengths of exons and introns
         self.ce = self.get_collapsed_coords(exclude_biotypes=exclude_biotypes)
@@ -339,9 +340,26 @@ class Gene(object):
         # cumul_len_adj[1::2] = exon_lengths
         cumul_len_adj = np.cumsum(cumul_len_adj)
 
-        #cumul_len_diff = cumul_len - cumul_len_adj
-        #self.map_pos = lambda x: x - reference - cumul_len_diff[np.searchsorted(cumul_len, x - self.start_pos, side='right')-1]
-        self.map_pos = lambda x: np.interp(x - self.start_pos, cumul_len, cumul_len_adj) + reference
+        self.cumul_len = cumul_len
+        self.cumul_len_adj = cumul_len_adj
+        # self.map_pos = lambda x: np.interp(x - self.start_pos, cumul_len, cumul_len_adj) + self.reference
+
+    def map_pos(self, x):
+
+        map_fct = lambda x: np.interp(x - self.start_pos, self.cumul_len, self.cumul_len_adj) + self.reference
+
+        x = np.array(x)
+        # y = map_fct(x)
+
+        y = np.zeros(x.shape, like=x)
+        m = (self.start_pos <= x) & (x <= self.end_pos)
+        y[m] = map_fct(x[m])
+        m = x < self.start_pos
+        y[m] = x[m] - self.start_pos + self.reference
+        m = x > self.end_pos
+        y[m] = x[m] - self.end_pos + map_fct(self.end_pos)
+
+        return y
 
     def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight_region=None,
              fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], wx=0.05, reference=None, ylabels='id',
@@ -746,7 +764,7 @@ class Annotation(object):
             for t in g.transcripts:
                 t.length = sum([e.length for e in t.exons])
             # add annotation
-            g.annotation = self
+            # g.annotation = self
 
         self.add_biotype()
 
