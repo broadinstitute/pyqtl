@@ -6,10 +6,9 @@ import subprocess
 import os
 import tempfile
 
-
-gt_dosage_dict = {'0/0':0, '0/1':1, '1/1':2, './.':np.NaN,
-                  '0|0':0, '0|1':1, '1|0':1, '1|1':2, '.|.':np.NaN}
-
+MISSING = -9  # PLINK2 convention
+gt_dosage_dict = {'0/0': 0, '0/1': 1, '1/1': 2, './.': MISSING,
+                  '0|0': 0, '0|1': 1, '1|0': 1, '1|1': 2, '.|.': MISSING}
 
 class GenotypeIndexer(object):
     def __init__(self, genotype_df, variant_df, sample_ids=None):
@@ -133,7 +132,7 @@ def get_genotype(variant_id, vcf, field='GT', convert_gt=True, sample_ids=None):
     """
 
     chrom, pos = variant_id.split('_')[:2]
-    s = subprocess.check_output('tabix '+vcf+' '+chrom+':'+pos+'-'+str(int(pos)+1), shell=True)
+    s = subprocess.check_output(f"tabix {vcf} {chrom}:{pos}-{pos}", shell=True)
     if len(s) == 0:
         raise ValueError(f"Variant '{variant_id}' not found in VCF.")
 
@@ -212,36 +211,49 @@ def get_allele_stats(genotype_df):
     return af, ma_samples, ma_count
 
 
-def load_vcf(vcf):
-    """Load dosages as DataFrame"""
+def load_vcf(vcf, field='GT', dtype=None, verbose=False):
+    """Load VCF as DataFrame"""
 
-    nvariants = int(subprocess.check_output(f'bcftools index -n {vcf}', shell=True).decode())
     sample_ids = subprocess.check_output(f'bcftools query -l {vcf}', shell=True).decode().strip().split()
-    nsamples = len(sample_ids)
-    dosages = np.zeros([nvariants, nsamples], dtype=np.float32)
+    n_samples = len(sample_ids)
+    n_variants = int(subprocess.check_output(f'bcftools index -n {vcf}', shell=True).decode())
 
-    gt_dosage_dict['./1'] = np.NaN
-    gt_dosage_dict['1/.'] = np.NaN
+    if dtype is None:
+        if field == 'GT':
+            dtype = np.int8
+        elif field == 'DS':
+            dtype = np.float32
+    dosages = np.zeros([n_variants, n_samples], dtype=dtype)
 
+    variant_ids = []
     with gzip.open(vcf, 'rt') as f:
         for line in f:
-            if line[:4]=='#CHR':
-                break
+            if line.startswith('#'): continue  # skip header lines
+            break
 
-        # parse first line
-        line = f.readline().strip().split('\t')
-        assert 'GT' in line[8]
-        gt_ix = line[8].split(':').index('GT')
-        variant_ids = [line[2]]
-        dosages[0,:] = [gt_dosage_dict[i.split(':')[gt_ix]] for i in line[9:]]
+        # parse format from first line
+        line = line.strip().split('\t')
+        if field not in line[8]:
+            raise ValueError(f"FORMAT does not include {field}. Available fields: {', '.join(line[8].split(':'))}")
+        format_ix = line[8].split(':').index(field)
+        variant_ids.append(line[2])
+        if field == 'GT':
+            dosages[0,:] = [gt_dosage_dict.get(i.split(':')[format_ix], MISSING) for i in line[9:]]
+        elif field == 'DS':
+            d = [i.split(':')[format_ix] for i in line[9:]]
+            d = [dtype(i) if i != '.' else dtype(MISSING) for i in d]
+            dosages[0,:] = d
 
         for k,line in enumerate(f, 1):
             line = line.strip().split('\t')
             variant_ids.append(line[2])
-            dosages[k,:] = [gt_dosage_dict[i.split(':')[gt_ix]] for i in line[9:]]
-            if np.mod(k,1000)==0:
-                print(f'\rVariants processed: {k:,}', end='')
-        print(f'\rVariants processed: {k:,}')
+            if field == 'GT':
+                dosages[k,:] = [gt_dosage_dict.get(i.split(':')[format_ix], MISSING) for i in line[9:]]
+            elif field == 'DS':
+                d = [i.split(':')[format_ix] for i in line[9:]]
+                d = [dtype(i) if i != '.' else dtype(MISSING) for i in d]
+                dosages[k,:] = d  # array?
+            if verbose and ((k+1) % 1000 == 0 or k+1 == n_variants):
+                print(f'\rVariants parsed: {k+1:,}', end='' if k+1 < n_variants else None)
 
     return pd.DataFrame(dosages, index=variant_ids, columns=sample_ids)
-
