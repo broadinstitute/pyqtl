@@ -107,11 +107,15 @@ def _read_regtools_junctions(junctions_file, convert_positions=True):
 
 def regtools_wrapper(args):
     """Wrapper for regtools junctions extract"""
-    bam_file, region_str, sample_id, bam_index_dir, strand = args
+    bam_file, region_str, sample_id, bam_index_dir, strand, user_project = args
     with tempfile.TemporaryDirectory() as tempdir:
         filtered_bam = os.path.join(tempdir, 'filtered.bam')
+        cmd = f"samtools view -b -F 2304 {bam_file}"
+        if user_project is not None:
+            cmd += f"?userProject={user_project}"
+        cmd += f" {region_str} > {filtered_bam}"
         with cd(bam_index_dir):
-            subprocess.check_call(f"samtools view -b -F 2304 {bam_file} {region_str} > {filtered_bam}", shell=True)
+            subprocess.check_call(cmd, shell=True)
         subprocess.check_call(f"samtools index {filtered_bam}", shell=True)
         junctions_file = os.path.join(tempdir, 'junctions.txt.gz')
         cmd = f"regtools junctions extract \
@@ -122,7 +126,7 @@ def regtools_wrapper(args):
     return junctions_s
 
 
-def regtools_extract_junctions(region_str, bam_s, bam_index_dir=None, strand=0, num_threads=12):
+def regtools_extract_junctions(region_str, bam_s, bam_index_dir=None, strand=0, num_threads=12, user_project=None):
     """
       region_str: string in 'chr:start-end' format
       bam_s: pd.Series or dict mapping sample_id->bam_path
@@ -130,7 +134,7 @@ def regtools_extract_junctions(region_str, bam_s, bam_index_dir=None, strand=0, 
     """
     junctions_df = []
     with mp.Pool(processes=num_threads) as pool:
-        for k,r in enumerate(pool.imap(regtools_wrapper, [(i,region_str,j,bam_index_dir,strand) for j,i in bam_s.items()]), 1):
+        for k,r in enumerate(pool.imap(regtools_wrapper, [(i,region_str,j,bam_index_dir,strand,user_project) for j,i in bam_s.items()]), 1):
             print(f'\r  * running regtools junctions extract on region {region_str} for bam {k}/{len(bam_s)}', end='')
             junctions_df.append(r)
         print()
@@ -287,22 +291,26 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         axv[-1].set_title(title, fontsize=11)
 
     # plot variant(s)
-    def _plot_variant(x):
+    def _plot_variant(x, color='tab:red'):
         for ax in axv:
             xlim = np.diff(ax.get_xlim())[0]
             ylim = np.diff(ax.get_ylim())[0]
             h = 0.04 * ylim
             b = h/np.sqrt(3) * ah/aw * xlim/ylim
             v = np.array([[x-b, -h-0.01*ylim], [x+b, -h-0.01*ylim], [x, -0.01*ylim]])
-            ax.add_patch(patches.Polygon(v, closed=True, color='r', clip_on=False, zorder=10))
+            ax.add_patch(patches.Polygon(v, closed=True, color=color, ec='k', lw=0.5, clip_on=False, zorder=10))
 
     if isinstance(plot_variants, str):
         x = gene.map_pos(int(plot_variants.split('_')[1]))
         _plot_variant(x)
     elif isinstance(plot_variants, Iterable):
         for i in plot_variants:
-            x = gene.map_pos(int(i.split('_')[1]))
-            _plot_variant(x)
+            ipos = int(i.split('_')[1])
+            x = gene.map_pos(ipos)
+            if pos is not None and ipos == pos:
+                _plot_variant(x, color='tab:red')
+            else:
+                _plot_variant(x, color='tab:orange')
     elif plot_variants == True and pos is not None:
         x = gene.map_pos(pos)
         _plot_variant(x)
