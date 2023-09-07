@@ -363,10 +363,14 @@ class Gene(object):
 
     def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight_region=None,
              fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], wx=0.05, reference=None, ylabels='id',
-             highlight_exons=None, highlight_introns=None, highlight_introns2=None, 
+             highlight_exons=None, highlight_introns=None, highlight_introns2=None,
              highlight_color='k', clip_on=False, yoffset=0, xlim=None,
              highlight_transcripts=None, exclude_biotypes=[]):
-        """Visualization"""
+        """
+        Plots the transcript structure of the gene.
+
+        highlight_introns : (list of) string(s) defining intron coordinates (first to last base of intron)
+        """
 
         transcripts = [t for t in self.transcripts if t.type not in exclude_biotypes]
 
@@ -448,7 +452,7 @@ class Gene(object):
                         if ic in introns:
                             s = self.map_pos(ic[0]-1)+1
                             e = self.map_pos(ic[1]+1)-1
-                            patch = patches.Rectangle((s, i-wx), e-s, 2*wx, fc=hsv_to_rgb([0, 0.8, 1]), zorder=1, clip_on=clip_on)
+                            patch = patches.Rectangle((s, y), e-s, wx, fc='lightskyblue', zorder=1, clip_on=clip_on)
                             ax.add_patch(patch)
 
                 if highlight_introns2 is not None:
@@ -456,7 +460,7 @@ class Gene(object):
                         if ic in introns:
                             s = self.map_pos(ic[0]-1)+1
                             e = self.map_pos(ic[1]+1)-1
-                            patch = patches.Rectangle((s, i-wx), e-s, 2*wx, fc=hsv_to_rgb([0.1, 0.8, 1]), zorder=1, clip_on=clip_on)
+                            patch = patches.Rectangle((s, y), e-s, wx, fc='#ffad33', zorder=1, clip_on=clip_on)
                             ax.add_patch(patch)
 
             # plot exons
@@ -545,9 +549,14 @@ class Gene(object):
             line.set_markersize(0)
             line.set_markeredgewidth(0)
 
-    def plot_junctions(self, ax, junction_df, coverage_s, show_counts=True,
-                       h=0.3, lw=3, lw_fct=np.sqrt, ec=[0.6]*3, clip_on=True):
-        """Plot junctions ("sashimi" plot)."""
+    def plot_junctions(self, ax, junction_df, coverage_s, show_counts=True, count_col='count',
+                       align='both', h=0.3, lw=3, lw_fct=np.sqrt, ec=[0.6]*3, clip_on=True):
+        """
+        Plot junctions ("sashimi" plot).
+
+        junction_df : pd.DataFrame, must contain count_col and
+                      'start' and 'end' columns corresponding to intron coordinates
+        """
 
         # new axes
         fig = ax.get_figure()
@@ -565,22 +574,25 @@ class Gene(object):
         ylim = ax.get_ylim()
 
         for _,r in junction_df.iterrows():
-            if r['start'] >= self.start_pos and r['end'] <= self.end_pos:
-                x1 = np.array([self.map_pos(r['start']), coverage_s[r['start']-1]])
-                x2 = np.array([self.map_pos(r['end']),   coverage_s[r['end']+1]])
+            x1 = np.array([self.map_pos(r['start']), coverage_s[r['start']-1]])
+            x2 = np.array([self.map_pos(r['end']),   coverage_s[r['end']+1]])
 
-                # relative position
-                dx = xlim[1] - xlim[0]
-                dy = ylim[1] - ylim[0]
-                x1_t = np.array([(x1[0]-xlim[0])/dx, (x1[1]-ylim[0])/dy*ys])
-                x2_t = np.array([(x2[0]-xlim[0])/dx, (x2[1]-ylim[0])/dy*ys])
+            # relative position
+            dx = xlim[1] - xlim[0]
+            dy = ylim[1] - ylim[0]
+            x1_t = np.array([(x1[0]-xlim[0])/dx, (x1[1]-ylim[0])/dy*ys])
+            x2_t = np.array([(x2[0]-xlim[0])/dx, (x2[1]-ylim[0])/dy*ys])
+            if align == 'minimum':
+                ymin = np.minimum(x1_t[1], x2_t[1])
+                x1_t[1] = ymin
+                x2_t[1] = ymin
 
-                _plot_arc(ax0, x1_t, x2_t, h*ys, lw=lw * lw_fct(r['score']/junction_df['score'].max()), ec=ec, clip_on=clip_on)
+            _plot_arc(ax0, x1_t, x2_t, h*ys, lw=lw * lw_fct(r[count_col]/junction_df[count_col].max()), ec=ec, clip_on=clip_on)
 
-                if show_counts:
-                    x0_t = (x1_t + x2_t) / 2
-                    txt = ax0.text(x0_t[0], x0_t[1]+h*ys/2, r['score'], ha='center', va='center', clip_on=clip_on)
-                    txt.set_bbox(dict(facecolor='w', alpha=0.75, edgecolor='none', boxstyle="round,pad=0.1"))
+            if show_counts:
+                x0_t = (x1_t + x2_t) / 2
+                txt = ax0.text(x0_t[0], x0_t[1]+h*ys/2, f"{r[count_col]:.2f}".rstrip('0').rstrip('.'), ha='center', va='center', clip_on=clip_on)
+                txt.set_bbox(dict(facecolor='w', alpha=0.75, edgecolor='none', boxstyle="round,pad=0.1"))
 
 
 def _plot_arc(ax, x1, x2, h, lw=1, ec='k', clip_on=True):

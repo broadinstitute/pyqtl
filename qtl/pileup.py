@@ -89,7 +89,7 @@ def samtools_depth(region_str, bam_s, bam_index_dir=None, flags='-aa -Q 255 -d 1
     return pileups_df
 
 
-def _read_regtools_junctions(junctions_file, convert_positions=True):
+def read_regtools_junctions(junctions_file, convert_positions=True):
     """
     Read output from regtools junctions extract
     and convert start/end positions to intron starts/ends.
@@ -101,7 +101,6 @@ def _read_regtools_junctions(junctions_file, convert_positions=True):
         junctions_df['start'] += junctions_df['block_sizes'].apply(lambda x: int(x.split(',')[0])) + 1
         junctions_df['end'] -= junctions_df['block_sizes'].apply(lambda x: int(x.split(',')[1]))
         junctions_df.index = junctions_df['chrom'] + ':' + junctions_df['start'].astype(str) + '-' + junctions_df['end'].astype(str) + ':' + junctions_df['strand']
-        return junctions_df['count']
     return junctions_df
 
 
@@ -122,8 +121,9 @@ def regtools_wrapper(args):
             -a 8 -m 50 -M 500000 -s {strand} \
             {filtered_bam} | gzip -c > {junctions_file}"
         subprocess.check_call(cmd, shell=True, stderr=subprocess.DEVNULL)
-        junctions_s = _read_regtools_junctions(junctions_file, convert_positions=True).rename(sample_id)
-    return junctions_s
+        junctions_df = read_regtools_junctions(junctions_file, convert_positions=True)
+    junctions_df.index.name = sample_id
+    return junctions_df
 
 
 def regtools_extract_junctions(region_str, bam_s, bam_index_dir=None, strand=0, num_threads=12, user_project=None):
@@ -134,9 +134,9 @@ def regtools_extract_junctions(region_str, bam_s, bam_index_dir=None, strand=0, 
     """
     junctions_df = []
     with mp.Pool(processes=num_threads) as pool:
-        for k,r in enumerate(pool.imap(regtools_wrapper, [(i,region_str,j,bam_index_dir,strand,user_project) for j,i in bam_s.items()]), 1):
+        for k,df in enumerate(pool.imap(regtools_wrapper, [(i,region_str,j,bam_index_dir,strand,user_project) for j,i in bam_s.items()]), 1):
             print(f'\r  * running regtools junctions extract on region {region_str} for bam {k}/{len(bam_s)}', end='')
-            junctions_df.append(r)
+            junctions_df.append(df['count'].rename(df.index.name))
         print()
     junctions_df = pd.concat(junctions_df, axis=1).fillna(0).astype(int)
     junctions_df.index.name = 'junction_id'
@@ -181,7 +181,7 @@ def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=No
     return df
 
 
-def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive',
+def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive', junctions_df=None,
          title=None, plot_variants=None, annot_track=None, max_intron=300, alpha=1, lw=0.5,
          highlight_introns=None, highlight_introns2=None, shade_range=None,
          ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
@@ -219,14 +219,15 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         gtlabels = None
 
     if pileup_dfs[0].shape[1] <= 3:
-        custom_cycler = cycler('color', [
+        cycler_colors = [
             # hsv_to_rgb([0.55, 0.75, 0.8]),  #(0.2, 0.65, 0.8),  # blue
             # hsv_to_rgb([0.08, 1, 1]),  #(1.0, 0.5, 0.0),   # orange
             # hsv_to_rgb([0.3, 0.7, 0.7]),  #(0.2, 0.6, 0.17),  # green
             '#0374B3',  # blue
             '#C84646',  # red
             '#C69B3A',  # gold
-        ])
+        ]
+        custom_cycler = cycler('color', cycler_colors)
     else:
         custom_cycler = None
 
@@ -279,11 +280,11 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
 
     if gtlabels is not None:
         gtlabels = gtlabels[sorder]
-    leg = axv[-1].legend(loc='upper left', handlelength=1, bbox_to_anchor=(1.02,1),
+    leg = axv[-1].legend(loc='upper left', handlelength=1, handletextpad=0.5, bbox_to_anchor=(1.02,1),
                          labelspacing=0.2, borderaxespad=0, labels=gtlabels)
-
     for line in leg.get_lines():
         line.set_linewidth(1)
+    axv[-1].add_artist(leg)
 
     if variant_id is not None and title is None:
         axv[-1].set_title(f"{gene.name} :: {variant_id.split('_b')[0].replace('_',':',1).replace('_','-')}", fontsize=11)
@@ -314,6 +315,15 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     elif plot_variants == True and pos is not None:
         x = gene.map_pos(pos)
         _plot_variant(x)
+
+    if plot_variants is not None:
+        kwargs = {'ec':'k', 'lw':0.5, 's':20, 'marker':'^'}
+        h1 = ax.scatter(np.NaN, np.NaN, fc='tab:red', **kwargs, label='Lead')
+        h2 = ax.scatter(np.NaN, np.NaN, fc='tab:orange', **kwargs, label='Other')
+        ax.legend(handles=[h1,h2], loc='lower left', title='CS variants',
+                  handlelength=1, handletextpad=0.5, borderaxespad=0, bbox_to_anchor=(1.02, 0))
+
+    ax.set_ylim([0, ax.get_ylim()[1]])
 
     # plot highlight/shading
     if shade_range is not None:
@@ -358,5 +368,18 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         gene.plot_coverage(coverage=annot_track, ax=tax, max_intron=max_intron)
         tax.tick_params(length=0, labelbottom=False)
     # axv[-1].set_xlabel(f'Exon coordinates on {gene.chr}', fontsize=12)
+
+    # need to plot last since this is plotted in a separate set of axes
+    if junctions_df is not None:
+        junctions_df = junctions_df.copy()
+        # junctions_df['start'] = gene.map_pos(junctions_df.index.map(lambda x: int(x.split('-')[0])))
+        # junctions_df['end'] = gene.map_pos(junctions_df.index.map(lambda x: int(x.split('-')[1])))
+        junctions_df['start'] = junctions_df.index.map(lambda x: int(x.split('-')[0]))
+        junctions_df['end'] = junctions_df.index.map(lambda x: int(x.split('-')[1]))
+        for k,i in enumerate(sorder):
+            s = pileup_dfs[0][i].copy()
+            #s.index = gene.map_pos(s.index)
+            gene.plot_junctions(ax, junctions_df, s, show_counts=False, align='minimum', count_col=i,
+                                h=0.3, lw=2, lw_fct=np.sqrt, ec=cycler_colors[k], clip_on=True)
 
     return axv
