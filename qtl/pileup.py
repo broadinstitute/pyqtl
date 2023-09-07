@@ -340,7 +340,10 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     gene.plot(ax=gax, max_intron=max_intron, wx=0.2, highlight_introns=highlight_introns,
               highlight_introns2=highlight_introns2, fc='k', ec='none', clip_on=True)
     gax.set_title('')
-    gax.set_ylabel('Isoforms', fontsize=10, rotation=0, ha='right', va='center')
+    if nt < 3:
+        gax.set_ylabel('Isoforms', fontsize=10, rotation=0, ha='right', va='center')
+    else:
+        gax.set_ylabel('Isoforms', fontsize=10, labelpad=15)
     plt.setp(gax.get_xticklabels(), visible=False)
     plt.setp(gax.get_yticklabels(), visible=False)
     for s in ['top', 'right', 'bottom', 'left']:
@@ -359,7 +362,9 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
             mpax.spines[i].set_visible(False)
             mpax.spines[i].set_linewidth(0.6)
         mpax.set_ylabel('Map.', fontsize=10, rotation=0, ha='right', va='center')
-        mpax.tick_params(length=0, labelbottom=False)
+        mpax.tick_params(axis='x', length=0, labelbottom=False)
+        mpax.tick_params(axis='y', labelsize=8)
+        mpax.spines['left'].set_position(('outward', 6))
         axv.append(mpax)
         plt.sca(axv[0])
 
@@ -372,13 +377,10 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     # need to plot last since this is plotted in a separate set of axes
     if junctions_df is not None:
         junctions_df = junctions_df.copy()
-        # junctions_df['start'] = gene.map_pos(junctions_df.index.map(lambda x: int(x.split('-')[0])))
-        # junctions_df['end'] = gene.map_pos(junctions_df.index.map(lambda x: int(x.split('-')[1])))
         junctions_df['start'] = junctions_df.index.map(lambda x: int(x.split('-')[0]))
         junctions_df['end'] = junctions_df.index.map(lambda x: int(x.split('-')[1]))
         for k,i in enumerate(sorder):
             s = pileup_dfs[0][i].copy()
-            #s.index = gene.map_pos(s.index)
             gene.plot_junctions(ax, junctions_df, s, show_counts=False, align='minimum', count_col=i,
                                 h=0.3, lw=2, lw_fct=np.sqrt, ec=cycler_colors[k], clip_on=True)
 
