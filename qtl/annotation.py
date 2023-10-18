@@ -12,6 +12,7 @@ import gzip
 import scipy.interpolate as interpolate
 from collections import defaultdict
 import pyBigWig
+from Bio.Seq import Seq
 from bx.intervals.intersection import IntervalTree
 
 
@@ -175,7 +176,7 @@ class Transcript(object):
         else:
             return np.concatenate([np.arange(r[1], r[0]-1, -1) for r in cds_ranges])
 
-    def get_sequence(self, feature='all', fasta=None, include_stop=False):
+    def get_sequence(self, feature='all', fasta_dict=None, fasta=None, include_stop=False):
         """Load transcript sequence from FASTA file"""
         if fasta is not None:
             if feature.lower() == 'all':
@@ -198,15 +199,16 @@ class Transcript(object):
             if self.gene.strand == '-':
                 region_strs = region_strs[::-1]
             s = get_sequence(fasta, region_strs, concat=True)
-        elif hasattr(self.gene, 'annotation') and self.gene.annotation.fasta_dict is not None:
+        #elif hasattr(self.gene, 'annotation') and self.gene.annotation.fasta_dict is not None:
+        elif fasta_dict is not None:
             if feature.lower() == 'all':
-                s = [self.gene.annotation.fasta_dict[self.gene.chr][e.start_pos-1:e.end_pos] for e in self.exons]
+                s = [fasta_dict[self.gene.chr][e.start_pos-1:e.end_pos] for e in self.exons]
                 if self.gene.strand == '-':
                     s = s[::-1]
                 s = ''.join(s)
             elif feature.lower() == 'utr3':
                 if len(self.utr3) > 0:
-                    s = [self.gene.annotation.fasta_dict[self.gene.chr][r[0]-1:r[1]] for r in self.utr3]
+                    s = [fasta_dict[self.gene.chr][r[0]-1:r[1]] for r in self.utr3]
                     if self.gene.strand == '-':
                         s = s[::-1]
                     s = ''.join(s)
@@ -214,7 +216,7 @@ class Transcript(object):
                     return None
             elif feature.lower() == 'utr5':
                 if len(self.utr5) > 0:
-                    s = [self.gene.annotation.fasta_dict[self.gene.chr][r[0]-1:r[1]] for r in self.utr5]
+                    s = [fasta_dict[self.gene.chr][r[0]-1:r[1]] for r in self.utr5]
                     if self.gene.strand == '-':
                         s = s[::-1]
                     s = ''.join(s)
@@ -222,7 +224,7 @@ class Transcript(object):
                     return None
             elif feature.lower() == 'cds':
                 cds_ranges = self.get_cds_ranges(include_stop=include_stop)
-                s = [self.gene.annotation.fasta_dict[self.gene.chr][r[0]-1:r[1]] for r in cds_ranges]
+                s = [fasta_dict[self.gene.chr][r[0]-1:r[1]] for r in cds_ranges]
                 if self.gene.strand == '-':
                     s = s[::-1]
                 s = ''.join(s)
@@ -251,6 +253,7 @@ class Gene(object):
         else:
             self.tss = end_pos
         self.transcripts = []
+        self.exclude_biotypes = []
         self.mappability = None
         if transcript_list:
             self.set_transcripts(transcript_list)
@@ -278,49 +281,41 @@ class Gene(object):
             c = bw.values(self.chr, self.start_pos-1, self.end_pos, numpy=True)
         return c
 
-    def get_collapsed_coords(self, exclude_biotypes=[]):
+    def get_collapsed_coords(self):
         """Returns coordinates of collapsed exons (= union of exons)"""
-        ecoord = [[e.start_pos, e.end_pos] for t in self.transcripts for e in t.exons if t.type not in exclude_biotypes]
+        ecoord = [[e.start_pos, e.end_pos] for t in self.transcripts for e in t.exons if t.type not in self.exclude_biotypes]
         return interval_union(ecoord)
 
     def collapse(self, exclude_biotypes=['readthrough_transcript', 'retained_intron']):
         """Return collapsed version of the gene"""
         g = copy.deepcopy(self)
+        g.exclude_biotypes = exclude_biotypes
         transcripts = [t for t in g.transcripts if t.type not in exclude_biotypes]
         start_pos = min([t.start_pos for t in transcripts])
         end_pos = max([t.end_pos for t in transcripts])
         t = Transcript(g.id, g.name, g.type, g, start_pos, end_pos)
-        exon_coords = g.get_collapsed_coords(exclude_biotypes=exclude_biotypes)
+        exon_coords = g.get_collapsed_coords()
         if g.strand == '-':
             exon_coords = exon_coords[::-1]
         t.exons = [Exon(f"{g.id}_{k}", k, t, i[0], i[1]) for k,i in enumerate(exon_coords, 1)]
         g.set_transcripts([t])
         return g
 
-    def shift_pos(self, offset):
-        self.start_pos += offset
-        self.end_pos += offset
-        for t in self.transcripts:
-            t.start_pos += offset
-            t.end_pos += offset
-            for e in t.exons:
-                e.start_pos += offset
-                e.end_pos += offset
-
     def set_transcripts(self, transcripts):
         self.transcripts = transcripts
         self.start_pos = np.min([t.start_pos for t in transcripts])
         self.end_pos = np.max([t.end_pos for t in transcripts])
 
-    def set_plot_coords(self, max_intron=1000, exclude_biotypes=[], reference=None):
+    def set_plot_coords(self, max_intron=1000, reference=None):
         """"""
         if reference is None:
-            self.reference = self.start_pos
+            # self.reference = self.start_pos
+            self.reference = np.min([t.start_pos for t in self.transcripts if t.type not in self.exclude_biotypes])
         else:
             self.reference = reference
 
         # cumulative lengths of exons and introns
-        self.ce = self.get_collapsed_coords(exclude_biotypes=exclude_biotypes)
+        self.ce = self.get_collapsed_coords()
         exon_lengths = self.ce[:,1] - self.ce[:,0] + 1
         intron_lengths = np.r_[0, self.ce[1:,0] - self.ce[:-1,1] - 1]
         cumul_len = np.zeros(2*len(exon_lengths), dtype=np.int32)
@@ -345,26 +340,27 @@ class Gene(object):
         # self.map_pos = lambda x: np.interp(x - self.start_pos, cumul_len, cumul_len_adj) + self.reference
 
     def map_pos(self, x):
+        start_pos = np.min([t.start_pos for t in self.transcripts if t.type not in self.exclude_biotypes])
+        end_pos = np.max([t.end_pos for t in self.transcripts if t.type not in self.exclude_biotypes])
 
-        map_fct = lambda x: np.interp(x - self.start_pos, self.cumul_len, self.cumul_len_adj) + self.reference
+        map_fct = lambda x: np.interp(x - start_pos, self.cumul_len, self.cumul_len_adj) + self.reference
 
         x = np.array(x)
-        # y = map_fct(x)
 
         y = np.zeros(x.shape, like=x)
-        m = (self.start_pos <= x) & (x <= self.end_pos)
+        m = (start_pos <= x) & (x <= end_pos)
         y[m] = map_fct(x[m])
-        m = x < self.start_pos
-        y[m] = x[m] - self.start_pos + self.reference
-        m = x > self.end_pos
-        y[m] = x[m] - self.end_pos + map_fct(self.end_pos)
+        m = x < start_pos
+        y[m] = x[m] - start_pos + self.reference
+        m = x > end_pos
+        y[m] = x[m] - end_pos + map_fct(end_pos)
 
         return y
 
     def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight_region=None,
              fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], wx=0.05, reference=None, ylabels='id',
              highlight_exons=None, highlight_introns=None, highlight_introns2=None,
-             highlight_color='k', clip_on=False, yoffset=0, xlim=None,
+             highlight_color='tab:red', clip_on=False, yoffset=0, xlim=None,
              highlight_transcripts=None, exclude_biotypes=[]):
         """
         Plots the transcript structure of the gene.
@@ -373,11 +369,12 @@ class Gene(object):
         """
 
         transcripts = [t for t in self.transcripts if t.type not in exclude_biotypes]
+        self.exclude_biotypes = exclude_biotypes
 
         max_intron = int(max_intron)
         if reference is None:
-            reference = self.start_pos
-        self.set_plot_coords(max_intron=max_intron, exclude_biotypes=exclude_biotypes, reference=reference)
+            reference = np.min([t.start_pos for t in transcripts])
+        self.set_plot_coords(max_intron=max_intron, reference=reference)
 
         axes_input = True
         if ax is None:
@@ -402,7 +399,7 @@ class Gene(object):
 
         if highlight_exons is not None:
             if isinstance(highlight_exons, str):
-                highlight_exons = {_str_to_pos(highlight_exons)}
+                highlight_exons = {_str_to_pos(i) for i in highlight_exons.split(',')}
             else:
                 highlight_exons = {_str_to_pos(i) for i in highlight_exons}
 
@@ -421,23 +418,73 @@ class Gene(object):
         if highlight_transcripts is not None and isinstance(highlight_transcripts, str):
             highlight_transcripts = [highlight_transcripts]
 
+        def get_vertices(start, end, utr5=None, utr3=None):
+            # utr5 and utr3 are defined relative to + strand here
+            # get transformed coordinates for plotting exons
+            assert end >= start
+            if utr5 is not None:
+                assert utr5[1] > utr5[0]
+            if utr3 is not None:
+                assert utr3[1] > utr3[0]
+
+            if utr5 is None and utr3 is None:
+                x = [start, end]
+                y = [1, 1]
+            elif utr5 is not None and utr3 is not None:
+                if start > utr5[1] and end < utr3[0]:
+                    x = [start, end]
+                    y = [1, 1]
+                elif (utr5[0] <= start and end <= utr5[1]) or (utr3[0] <= start and end <= utr3[1]):
+                    x = [start, end]
+                    y = [0.5, 0.5]
+                elif utr5[0] <= start and start <= utr5[1] and utr3[0] <= end and end <= utr3[1]:
+                    x = [start, utr5[1]+1, utr5[1]+1, utr3[0]-1, utr3[0]-1, end]
+                    y = [0.5, 0.5, 1, 1, 0.5, 0.5]
+                elif utr5[0] <= start and start <= utr5[1] and utr5[1] < end and end < utr3[0]:
+                    x = [start, utr5[1]+1, utr5[1]+1, end]
+                    y = [0.5, 0.5, 1, 1]
+                elif utr5[1] < start and start < utr3[0] and utr3[0] <= end and end <= utr3[1]:
+                    x = [start, utr3[0]-1, utr3[0]-1, end]
+                    y = [1, 1, 0.5, 0.5]
+                else:
+                    raise ValueError('Unexpected vertices')
+            elif utr5 is not None:
+                if start > utr5[1]:
+                    x = [start, end]
+                    y = [1, 1]
+                elif utr5[0] <= start and end <= utr5[1]:
+                    x = [start, end]
+                    y = [0.5, 0.5]
+                elif utr5[0] <= start and start <= utr5[1] and end > utr5[1]:
+                    x = [start, utr5[1]+1, utr5[1]+1, end]
+                    y = [0.5, 0.5, 1, 1]
+            elif utr3 is not None:
+                if end < utr3[0]:
+                    x = [start, end]
+                    y = [1, 1]
+                if utr3[0] <= start and end <= utr3[1]:
+                    x = [start, end]
+                    y = [0.5, 0.5]
+                elif start < utr3[0] and utr3[0] <= end and end <= utr3[1]:
+                    x = [start, utr3[0]-1, utr3[0]-1, end]
+                    y = [1, 1, 0.5, 0.5]
+
+            x = self.map_pos(x)
+            x = np.r_[x, x[::-1]]
+            y = np.r_[y, -np.array(y[::-1])]
+            return x, y
+
         # plot transcripts; positions are in genomic coordinates
         for i,t in enumerate(transcripts[::-1], yoffset):
-            # UTR mask
-            utr = np.zeros(t.end_pos-t.start_pos+1)
-            for u in t.utr5:
-                utr[u[0]-t.start_pos:u[1]-t.start_pos+1] = 1
-            for u in t.utr3:
-                utr[u[0]-t.start_pos:u[1]-t.start_pos+1] = 1
-
             # plot background line
             s = self.map_pos(t.start_pos)
             e = self.map_pos(t.end_pos)
             y = i - wx/2
+            # background line
             if highlight_transcripts is not None and t.id in highlight_transcripts:
                 patch = patches.Rectangle((s, y), e-s, wx, fc='k', zorder=0, clip_on=clip_on)
             else:
-                patch = patches.Rectangle((s, y), e-s, wx, fc=fc, zorder=0, clip_on=clip_on)
+                patch = patches.Rectangle((s, y), e-s, wx, fc=fc if t.type == 'protein_coding' else 'darkgray', zorder=0, clip_on=clip_on)
             ax.add_patch(patch)
 
             # plot highlighted introns
@@ -464,21 +511,89 @@ class Gene(object):
                             ax.add_patch(patch)
 
             # plot exons
+            # utrs = t.utr5 + t.utr3
             for e in t.exons:
-                ev = np.ones(e.end_pos-e.start_pos+1)  # height
-                ev[utr[e.start_pos-t.start_pos:e.end_pos-t.start_pos+1] == 1] = 0.5  # UTRs
-                # adjust for skipped intron positions
-                ex = np.arange(self.map_pos(e.start_pos), self.map_pos(e.end_pos)+1)  # position
-
-                vertices = np.vstack((np.hstack((ex, ex[::-1], ex[0])), i+scale*np.hstack((ev,-ev[::-1], ev[0])))).T
-
-                if highlight_exons is not None and (e.start_pos, e.end_pos) in highlight_exons:
-                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=highlight_color, ec='none', lw=0, zorder=2, clip_on=clip_on)
-                elif highlight_transcripts is not None and t.id in highlight_transcripts:
-                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=highlight_color, ec='none', lw=0, zorder=2, clip_on=clip_on)
+                # check for overlapping UTRs
+                utr5 = [i for i in t.utr5 if i[0] == e.start_pos or i[1] == e.end_pos]
+                utr3 = [i for i in t.utr3 if i[0] == e.start_pos or i[1] == e.end_pos]
+                if self.strand == '-':
+                    utr5, utr3 = utr3, utr5
+                if len(utr5) == 0:
+                    utr5 = None
                 else:
-                    patch = patches.PathPatch(mpath.Path(vertices, closed=True), fc=fc, ec='none', lw=0, zorder=2, clip_on=clip_on)
-                ax.add_patch(patch)
+                    assert len(utr5) == 1
+                    utr5 = utr5[0]
+                if len(utr3) == 0:
+                    utr3 = None
+                else:
+                    assert len(utr3) == 1
+                    utr3 = utr3[0]
+                x, y = get_vertices(e.start_pos, e.end_pos, utr5=utr5, utr3=utr3)
+                # u = [i for i in utrs if i[0] == e.start_pos or i[1] == e.end_pos]
+                # if u:
+                #     assert len(u) == 1
+                #     u = u[0]
+                #     x, y = get_vertices(e.start_pos, e.end_pos, utr=u)
+                # else:
+                #     u = None
+                #     x, y = get_vertices(e.start_pos, e.end_pos)
+
+                #     if u[0] == e.start_pos and u[1] == e.end_pos:
+                #         x = u
+                #         y = [0.5, 0.5]
+                #     elif u[0] == e.start_pos and u[1] < e.end_pos:
+                #         x = u + [u[1], e.end_pos]
+                #         y = [0.5, 0.5, 1, 1]
+                #     elif u[0] > e.start_pos and u[1] == e.end_pos:
+                #         x = [e.start_pos, u[0]] + u
+                #         y = [1, 1, 0.5, 0.5]
+                #     else:
+                #         raise ValueError(f"Misspecified UTR in {t.id}")
+                # else:
+                #     x = [e.start_pos, e.end_pos]
+                #     y = [1, 1]
+                # x = self.map_pos(x)
+                # x = np.r_[x, x[::-1]]
+                # y = i+scale*np.r_[y, -np.array(y[::-1])]
+                y = i + scale*y
+                ax.add_patch(patches.PathPatch(mpath.Path(np.c_[x, y], closed=False), ec='none', lw=0,
+                                               fc=fc if t.type == 'protein_coding' else 'darkgray',
+                                               zorder=2, clip_on=clip_on))
+
+                if highlight_exons is not None:
+                    match = [i for i in highlight_exons if e.start_pos <= i[0] and i[1] <= e.end_pos]
+                    if match:
+                        assert len(match) == 1
+                        match = match[0]
+                        x, y = get_vertices(match[0], match[1], utr5=utr5, utr3=utr3)
+                        y = i + scale*y
+                        ax.add_patch(patches.PathPatch(mpath.Path(np.c_[x, y], closed=False), ec='none', lw=0,
+                                                       fc=highlight_color,
+                                                       zorder=3, clip_on=clip_on))
+
+                # ev = np.ones(e.end_pos-e.start_pos+1)  # height
+                # ev[utr[e.start_pos-t.start_pos:e.end_pos-t.start_pos+1] == 1] = 0.5  # UTRs
+                # ex = np.arange(self.map_pos(e.start_pos), self.map_pos(e.end_pos)+1)  # position
+                # vertices = np.vstack((np.hstack((ex, ex[::-1], ex[0])), i+scale*np.hstack((ev,-ev[::-1], ev[0])))).T
+
+                # if highlight_exons is not None:
+                #     if (e.start_pos, e.end_pos) in highlight_exons:  # entire exon
+                #         ax.add_patch(patches.PathPatch(mpath.Path(vertices, closed=True), fc=highlight_color, ec='none', lw=0, zorder=2, clip_on=clip_on))
+                #     else:
+                #         ax.add_patch(patches.PathPatch(mpath.Path(vertices, closed=True), ec='none', lw=0,
+                #                                        fc=fc if t.type == 'protein_coding' else 'darkgray',
+                #                                        zorder=2, clip_on=clip_on))
+                #         # x = [x for x in highlight_exons if x[0] >= e.start_pos and x[1] <= e.end_pos]
+                #         # if x:
+                #         #     x =
+                #         #     ax.add_patch(patches.PathPatch(mpath.Path(vertices, closed=True), fc=highlight_color, ec='none', lw=0, zorder=2, clip_on=clip_on))
+                #
+                # elif highlight_transcripts is not None and t.id in highlight_transcripts:
+                #     ax.add_patch(patches.PathPatch(mpath.Path(vertices, closed=True), fc=highlight_color, ec='none', lw=0, zorder=2, clip_on=clip_on))
+                # else:
+                #     ax.add_patch(patches.PathPatch(mpath.Path(vertices, closed=True), ec='none', lw=0,
+                #                                    fc=fc if t.type == 'protein_coding' else 'darkgray',
+                #                                    zorder=2, clip_on=clip_on))
 
         if highlight_region is not None:
             s,e = highlight_region.split(':')[-1].split('-')
@@ -488,6 +603,9 @@ class Gene(object):
             ax.add_patch(patch)
 
         ax.set_ylim([-0.6, i+0.6])
+
+        #ax.set_xlim([self.ce[0][0], self.ce[-1][1]])
+        # ax.set_xlim(self.map_pos([np.min([t.start_pos for t in transcripts]), np.max([t.end_pos for t in transcripts])]))
         if xlim is not None:
             ax.set_xlim(xlim)
         else:
@@ -503,8 +621,13 @@ class Gene(object):
             ax.set_yticklabels([getattr(t, ylabels) for t in transcripts[::-1]], fontsize=9)
 
         if not axes_input:
-            ax.set_xticks(self.map_pos(np.array([self.start_pos, self.end_pos])))
-            ax.set_xticklabels([self.start_pos, self.end_pos], ha='center', fontsize=9)
+            start_pos = np.min([t.start_pos for t in self.transcripts if t.type not in self.exclude_biotypes])
+            end_pos = np.max([t.end_pos for t in self.transcripts if t.type not in self.exclude_biotypes])
+            x = self.map_pos([start_pos, end_pos])
+            ax.set_xticks(x)
+            ax.set_xticklabels([f"{start_pos:,}", f"{end_pos:,}"], ha='center', fontsize=9)
+        #     ax.set_xticks(self.map_pos(np.array([self.start_pos, self.end_pos])))
+        #     ax.set_xticklabels([self.start_pos, self.end_pos], ha='center', fontsize=9)
             # add transcript type label
             ax2 = ax.twinx()
             ax2.set_ylim([-0.6, i+0.6])
