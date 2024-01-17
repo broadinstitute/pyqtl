@@ -27,8 +27,8 @@ def _get_api_data():
     context = ssl.create_default_context()
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
-    tissues_json = json.loads(urllib.request.urlopen('https://gtexportal.org/rest/v1/dataset/tissueInfo',
-                                                     context=context).read().decode())['tissueInfo']
+    tissues_json = json.loads(urllib.request.urlopen('https://gtexportal.org/api/v2/dataset/tissueSiteDetail',
+                                                     context=context).read().decode())['data']
     return tissues_json
 
 
@@ -42,9 +42,9 @@ def get_colors_df(diff_brain=False):
         'tissueSiteDetail':'tissue_site_detail',
         'tissueSiteDetailAbbr':'tissue_abbrv',
         'tissueSite':'tissue_site',
-        'uberonId':'uberon_id',
+        'ontologyId':'ontology_id',
     }).set_index('tissue_id')
-    colors_df = colors_df[['tissue_site', 'tissue_site_detail', 'tissue_abbrv', 'uberon_id', 'color_rgb', 'color_hex']]
+    colors_df = colors_df[['tissue_site', 'tissue_site_detail', 'tissue_abbrv', 'ontology_id', 'color_rgb', 'color_hex']]
     colors_df['color_hex'] = '#' + colors_df['color_hex']
     if diff_brain:
         rgb_s = pd.Series({
