@@ -9,7 +9,7 @@ from collections.abc import Iterable
 import multiprocessing as mp
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from matplotlib.colors import hsv_to_rgb
+from matplotlib.colors import hsv_to_rgb, rgb2hex
 import seaborn as sns
 from cycler import cycler
 import pyBigWig
@@ -227,9 +227,9 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
             '#C84646',  # red
             '#C69B3A',  # gold
         ]
-        custom_cycler = cycler('color', cycler_colors)
     else:
-        custom_cycler = None
+        cycler_colors = [rgb2hex(i) for i in plt.cm.tab10(np.arange(10))]
+    custom_cycler = cycler('color', cycler_colors)
 
     fig = plt.figure(facecolor=(1,1,1), figsize=(fw,fh))
     ax = fig.add_axes([dl/fw, (db+da+ds)/fh, aw/fw, ah/fh])
@@ -377,8 +377,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     # need to plot last since this is plotted in a separate set of axes
     if junctions_df is not None:
         junctions_df = junctions_df.copy()
-        junctions_df['start'] = junctions_df.index.map(lambda x: int(x.split('-')[0]))
-        junctions_df['end'] = junctions_df.index.map(lambda x: int(x.split('-')[1]))
+        junctions_df['start'] = junctions_df.index.map(lambda x: int(x.split(':')[1].split('-')[0]))
+        junctions_df['end'] = junctions_df.index.map(lambda x: int(x.split(':')[1].split('-')[1]))
         for k,i in enumerate(sorder):
             s = pileup_dfs[0][i].copy()
             gene.plot_junctions(ax, junctions_df, s, show_counts=False, align='minimum', count_col=i,
