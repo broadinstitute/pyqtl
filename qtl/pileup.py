@@ -138,7 +138,7 @@ def regtools_extract_junctions(region_str, bam_s, bam_index_dir=None, strand=0, 
             print(f'\r  * running regtools junctions extract on region {region_str} for bam {k}/{len(bam_s)}', end='')
             junctions_df.append(df['count'].rename(df.index.name))
         print()
-    junctions_df = pd.concat(junctions_df, axis=1).fillna(0).astype(int)
+    junctions_df = pd.concat(junctions_df, axis=1).infer_objects().fillna(0).astype(np.int32)
     junctions_df.index.name = 'junction_id'
     return junctions_df
 
