@@ -357,8 +357,8 @@ class Gene(object):
 
         return y
 
-    def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, highlight_region=None,
-             fc=[0.6, 0.88, 1], ec=[0, 0.7, 1], wx=0.05, reference=None, ylabels='id',
+    def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, show_cds=True, highlight_region=None,
+             pc_color=[0.6, 0.88, 1], nc_color='#aaaaaa', ec=[0, 0.7, 1], wx=0.05, reference=None, ylabels='id',
              highlight_exons=None, highlight_introns=None, highlight_introns2=None,
              highlight_color='tab:red', clip_on=False, yoffset=0, xlim=None,
              highlight_transcripts=None, exclude_biotypes=[]):
@@ -484,7 +484,7 @@ class Gene(object):
             if highlight_transcripts is not None and t.id in highlight_transcripts:
                 patch = patches.Rectangle((s, y), e-s, wx, fc='k', zorder=0, clip_on=clip_on)
             else:
-                patch = patches.Rectangle((s, y), e-s, wx, fc=fc if t.type == 'protein_coding' else 'darkgray', zorder=0, clip_on=clip_on)
+                patch = patches.Rectangle((s, y), e-s, wx, fc=pc_color if t.type == 'protein_coding' else nc_color, zorder=0, clip_on=clip_on)
             ax.add_patch(patch)
 
             # plot highlighted introns
@@ -529,6 +529,8 @@ class Gene(object):
                     assert len(utr3) == 1
                     utr3 = utr3[0]
                 x, y = get_vertices(e.start_pos, e.end_pos, utr5=utr5, utr3=utr3)
+                if not show_cds:
+                    y[np.abs(y) == 0.5] *= 2
                 # u = [i for i in utrs if i[0] == e.start_pos or i[1] == e.end_pos]
                 # if u:
                 #     assert len(u) == 1
@@ -557,7 +559,7 @@ class Gene(object):
                 # y = i+scale*np.r_[y, -np.array(y[::-1])]
                 y = i + scale*y
                 ax.add_patch(patches.PathPatch(mpath.Path(np.c_[x, y], closed=False), ec='none', lw=0,
-                                               fc=fc if t.type == 'protein_coding' else 'darkgray',
+                                               fc=pc_color if t.type == 'protein_coding' else nc_color,
                                                zorder=2, clip_on=clip_on))
 
                 if highlight_exons is not None:
@@ -618,7 +620,11 @@ class Gene(object):
 
         if ylabels is not None:
             ax.set_yticks(range(len(transcripts)))
-            ax.set_yticklabels([getattr(t, ylabels) for t in transcripts[::-1]], fontsize=9)
+            yticklabels = [getattr(t, ylabels) for t in transcripts[::-1]]
+            ax.set_yticklabels(yticklabels, fontsize=9)
+            mane_transcript = self.get_mane_transcript()
+            if mane_transcript is not None:
+                ax.get_yticklabels()[yticklabels.index(getattr(mane_transcript, ylabels))].set_color('tab:red')
 
         if not axes_input:
             start_pos = np.min([t.start_pos for t in self.transcripts if t.type not in self.exclude_biotypes])
@@ -644,6 +650,14 @@ class Gene(object):
             ax.set_xlabel(self.chr, fontsize=12)
 
         return ax
+
+    def get_mane_transcript(self, tag='MANE_Select'):
+        mane_transcript = [t for t in self.transcripts if 'tags' in t.attributes and tag in t.attributes['tags']]
+        assert len(mane_transcript) <= 1
+        if len(mane_transcript) == 1:
+            return mane_transcript[0]
+        else:
+            return None
 
     def plot_coverage(self, coverage, ax, color=3*[0.66], max_intron=1000):
         # only plot first max_intron bases of introns
