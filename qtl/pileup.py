@@ -182,9 +182,10 @@ def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=No
 
 
 def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive', junctions_df=None,
-         title=None, plot_variants=None, annot_track=None, max_intron=300, alpha=1, lw=0.5,
-         highlight_introns=None, highlight_introns2=None, shade_range=None,
+         title=None, plot_variants=None, annot_track=None, max_intron=300, alpha=1, lw=0.5, junction_lw=2,
+         highlight_introns=None, highlight_introns2=None, shade_range=None, colors=None,
          ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
+         pc_color='k', nc_color='darkgray', show_cds=True,
          dl=0.75, aw=4.5, dr=0.75, db=0.5, ah=1.5, dt=0.25, ds=0.2):
     """
       pileup_dfs:
@@ -255,15 +256,20 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     gene.set_plot_coords(max_intron=max_intron)
     for k,ax in enumerate(axv):
         xi = gene.map_pos(pileup_dfs[k].index)
-        for i in sorder:
+        for j,i in enumerate(sorder):
             if i in pileup_dfs[k]:
                 if outline:
-                    ax.plot(xi, pileup_dfs[k][i], label=i, lw=lw, alpha=alpha, rasterized=rasterized)
+                    if colors is not None:
+                        c = colors[i]
+                    else:
+                        c = cycler_colors[j]
+                    ax.plot(xi, pileup_dfs[k][i], color=c, label=i, lw=lw, alpha=alpha, rasterized=rasterized)
                 else:
                     ax.fill_between(xi, pileup_dfs[k][i], label=i, alpha=alpha, rasterized=rasterized)
 
     if labels is None:
         labels = ['Mean RPM'] * num_pileups
+    # format
     for k,ax in enumerate(axv):
         ax.margins(0)
         ax.set_ylabel(labels[k], fontsize=12)
@@ -284,7 +290,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
                          labelspacing=0.2, borderaxespad=0, labels=gtlabels)
     for line in leg.get_lines():
         line.set_linewidth(1)
-    axv[-1].add_artist(leg)
+    # axv[-1].add_artist(leg, clip_on=False)
 
     if variant_id is not None and title is None:
         axv[-1].set_title(f"{gene.name} :: {variant_id.split('_b')[0].replace('_',':',1).replace('_','-')}", fontsize=11)
@@ -338,7 +344,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     # add gene model
     gax = fig.add_axes([dl/fw, db/fh, aw/fw, da/fh], sharex=axv[0])
     gene.plot(ax=gax, max_intron=max_intron, wx=0.2, highlight_introns=highlight_introns,
-              highlight_introns2=highlight_introns2, fc='k', ec='none', clip_on=True)
+              highlight_introns2=highlight_introns2, ec='none', clip_on=True,
+              pc_color=pc_color, nc_color=nc_color, show_cds=show_cds)
     gax.set_title('')
     if nt < 3:
         gax.set_ylabel('Isoforms', fontsize=10, rotation=0, ha='right', va='center')
@@ -381,7 +388,11 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         junctions_df['end'] = junctions_df.index.map(lambda x: int(x.split(':')[1].split('-')[1]))
         for k,i in enumerate(sorder):
             s = pileup_dfs[0][i].copy()
+            if colors is not None:
+                ec = colors[i]
+            else:
+                ec = cycler_colors[k]
             gene.plot_junctions(ax, junctions_df, s, show_counts=False, align='minimum', count_col=i,
-                                h=0.3, lw=2, lw_fct=np.sqrt, ec=cycler_colors[k], clip_on=True)
+                                h=0.3, lw=junction_lw, lw_fct=np.sqrt, ec=ec, clip_on=True)
 
     return axv
