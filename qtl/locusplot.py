@@ -211,7 +211,10 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
         variant_ids = []
         for p in pvals:
             if 'pval_nominal' in p:
-                variant_ids.append(p['pval_nominal'].idxmin())
+                if p['pval_nominal'].max() > 1:  # assume -log10(P)
+                    variant_ids.append(p['pval_nominal'].idxmax())
+                else:
+                    variant_ids.append(p['pval_nominal'].idxmin())
             elif 'pip' in p:
                 variant_ids.append(p['pip'].idxmax())
             else:
@@ -281,15 +284,19 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
     ylabels = []
     for k,(ax,variant_id,pval_df) in enumerate(zip(axes, variant_ids, pvals)):
         # select variants in window
-        m = (pval_df['position']>=xlim[0]) & (pval_df['position']<=xlim[1])
+        m = (pval_df['position'] >= xlim[0]) & (pval_df['position'] <= xlim[1])
         if shared_only:
             m &= pval_df.index.isin(common_ix)
         window_df = pval_df.loc[m]
         x = window_df['position']
         if 'pval_nominal' in pval_df:
-            p = -np.log10(window_df['pval_nominal'])
+            if pval_df['pval_nominal'].max() > 1:  # assume values are already -log10(P)
+                p = window_df['pval_nominal']
+                minp = pval_df.loc[variant_id, 'pval_nominal']
+            else:
+                p = -np.log10(window_df['pval_nominal'])
+                minp = -np.log10(pval_df.loc[variant_id, 'pval_nominal'])
             ylabels.append(ylabel)
-            minp = -np.log10(pval_df.loc[variant_id, 'pval_nominal'])
 
             # sort variants by LD; plot high LD in front
             if r2_s is not None:

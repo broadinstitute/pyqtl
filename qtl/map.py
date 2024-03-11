@@ -10,10 +10,17 @@ import scipy.stats
 from . import stats
 from . import genotype as gt
 from . import locusplot
+try:
+    import rpy2
+    has_rpy2 = True
+except:
+    has_rpy2 = False
 
 
-def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True):
+def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True, logp=False):
     """Compute genotype-phenotype associations"""
+    if logp and not has_rpy2:
+        raise ValueError("The rpy2 package is required to compute log p-values.")
     if isinstance(genotype, pd.Series):
         genotype_df = genotype.to_frame().T
     elif isinstance(genotype, pd.DataFrame):
@@ -49,7 +56,12 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
     dof = gt_res_df.shape[1] - 2 - num_covar
 
     tstat = r * np.sqrt(dof/(1-r*r))
-    pval = 2*scipy.stats.t.cdf(-np.abs(tstat), dof)
+    if not logp:
+        pval = 2*scipy.stats.t.cdf(-np.abs(tstat), dof)
+    else:
+        r_pt = rpy2.robjects.r['pt']
+        rt = rpy2.robjects.vectors.FloatVector(-np.abs(tstat))
+        pval = -(np.array(r_pt(rt, dof, lower_tail=True, log=True)) + np.log(2)) * np.log10(np.e)
 
     df = pd.DataFrame(pval, index=tstat.index, columns=['pval_nominal'])
     df['slope'] = r * n
@@ -67,15 +79,20 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
     a = (genotype_df * m).sum(1).round().astype(int)  # round for missing/imputed genotypes
     df['ma_count'] = np.where(ix, a, n2-a)
     if isinstance(genotype, pd.DataFrame):
-        df['r2'] = locusplot.compute_ld(genotype, df['pval_nominal'].idxmin())
+        if logp:
+            df['r2'] = locusplot.compute_ld(genotype, df['pval_nominal'].idxmax())
+        else:
+            df['r2'] = locusplot.compute_ld(genotype, df['pval_nominal'].idxmin())
 
     if isinstance(df.index[0], str) and '_' in df.index[0]:
         df['chr'] = df.index.map(lambda x: x.split('_')[0])
         df['position'] = df.index.map(lambda x: int(x.split('_')[1]))
     df.index.name = 'variant_id'
-    # if isinstance(genotype, pd.Series):
-    #     df = df.iloc[0]
-    df.loc[df['pval_nominal'] == 0, 'pval_nominal'] = np.nextafter(0, 1)  # np.finfo(np.float64).tiny
+    m = df['pval_nominal'] == 0
+    if any(m):
+        e = np.nextafter(0, 1)  # np.finfo(np.float64).tiny
+        print(f"Warning: underflow detected (setting to {e}), use logp=True to compute p-values as -log10(P).")
+        df.loc[m, 'pval_nominal'] = e
     return df
 
 
