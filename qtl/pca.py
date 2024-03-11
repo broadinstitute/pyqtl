@@ -37,7 +37,7 @@ def normalize_counts(gct_df, C=None, threshold=10, threshold_frac=0.1):
     return gct_norm_std_df
 
 
-def get_pcs(gct_df, normalize=True, C=None, n_components=5, return_loadings=False):
+def get_pcs(gct_df, normalize=True, C=None, n_components=5, return_loadings=False, random_state=None):
     """
     Scale input GCT, threshold, normalize and calculate PCs
     """
@@ -46,7 +46,7 @@ def get_pcs(gct_df, normalize=True, C=None, n_components=5, return_loadings=Fals
     else:
         gct_norm_std_df = gct_df
 
-    pca = sklearn.decomposition.PCA(n_components=n_components, svd_solver='full')
+    pca = sklearn.decomposition.PCA(n_components=n_components, svd_solver='auto', random_state=random_state)
     pca.fit(gct_norm_std_df.T)
     P = pca.transform(gct_norm_std_df.T)
     pc_df = pd.DataFrame(P, index=gct_norm_std_df.columns,

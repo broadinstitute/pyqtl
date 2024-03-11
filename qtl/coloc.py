@@ -190,23 +190,23 @@ def abf(df1, df2, N=None, sdy=None, p1=1e-4, p2=1e-4, p12=1e-5, verbose=False):
     """
 
     if 'sample_size' in df1:
-        n1 = int(df1['sample_size'][0])
+        n1 = int(df1['sample_size'].values[0])
     else:
         assert N is not None
         n1 = N
 
     if 'sample_size' in df2:
-        n2 = int(df2['sample_size'][0])
+        n2 = int(df2['sample_size'].values[0])
     else:
         assert N is not None
         n2 = N
 
     if 'p_std' in df1:
-        sdy1 = float(df1['p_std'][0])
+        sdy1 = float(df1['p_std'].values[0])
     else:
         sdy1 = sdy
     if 'p_std' in df2:
-        sdy2 = float(df2['p_std'][0])
+        sdy2 = float(df2['p_std'].values[0])
     else:
         sdy2 = sdy
     mdf1 = process_dataset(df1, N=n1, sdy=sdy1)
