@@ -68,7 +68,7 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
 
     fw = dl + nc*aw + (nc-1)*dx + dr
     fh = db + nr*ah + (nr-1)*dy + dt
-    fig = plt.figure(figsize=(fw,fh))
+    fig = plt.figure(figsize=(fw,fh), facecolor='none')
     axes = []
     n = 0
 
@@ -130,7 +130,7 @@ def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
 
     # set tick positions
     if 'top' in hide and 'bottom' in hide:
-        ax.get_xaxis().set_ticks_position('none')
+        ax.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
     elif 'top' in hide:
         ax.get_xaxis().set_ticks_position('bottom')
     elif 'bottom' in hide:
@@ -139,7 +139,7 @@ def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
         ax.get_xaxis().set_ticks_position('both')
 
     if 'left' in hide and 'right' in hide:
-        ax.get_yaxis().set_ticks_position('none')
+        ax.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
     elif 'left' in hide:
         ax.get_yaxis().set_ticks_position('right')
     elif 'right' in hide:
