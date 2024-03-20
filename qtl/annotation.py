@@ -423,9 +423,9 @@ class Gene(object):
             # get transformed coordinates for plotting exons
             assert end >= start
             if utr5 is not None:
-                assert utr5[1] > utr5[0]
+                assert utr5[1] >= utr5[0]
             if utr3 is not None:
-                assert utr3[1] > utr3[0]
+                assert utr3[1] >= utr3[0]
 
             if utr5 is None and utr3 is None:
                 x = [start, end]
