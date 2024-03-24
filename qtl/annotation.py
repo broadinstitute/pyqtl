@@ -12,7 +12,6 @@ import gzip
 import scipy.interpolate as interpolate
 from collections import defaultdict
 import pyBigWig
-from Bio.Seq import Seq
 from bx.intervals.intersection import IntervalTree
 
 
