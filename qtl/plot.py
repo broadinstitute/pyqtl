@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.ticker as ticker
 import matplotlib.colors as colors
-from matplotlib.colors import hsv_to_rgb, ListedColormap
+from matplotlib.colors import hsv_to_rgb, ListedColormap, LogNorm
 import seaborn as sns
 import scipy.cluster.hierarchy as hierarchy
 from cycler import cycler
@@ -187,15 +187,13 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
     assert p.index.equals(g.index)
 
     if show_pval:
-        pval = qtl_map.calculate_association(g, p, covariates_df=covariates_df)['pval_nominal']
-        if not np.isscalar(pval):
-            pval = pval[0]
+        stats_s = qtl_map.calculate_association(g, p, covariates_df=covariates_df).iloc[0]
 
     if covariates_df is not None:
         # only residualize the phenotype for plotting
         p = stats.residualize(p.copy(), covariates_df.loc[p.index])
 
-    qtl_df = pd.concat([g, p], axis=1)
+    qtl_df = pd.concat([g.round().astype(int), p], axis=1)
     qtl_df.columns = ['genotype', 'phenotype']
     if label_s is not None:
         qtl_df = pd.concat([qtl_df, label_s], axis=1, sort=False)
@@ -219,12 +217,8 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             l = ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1), fontsize=8, handlelength=0.6, ncol=2, handletextpad=0.5, labelspacing=0.33)
             l.set_title(None)
         else:
-            colors = [
-                color,
-            ]
-            pal = sns.color_palette(colors)
             sns.violinplot(x="genotype", y="phenotype", data=qtl_df,
-                           cut=0, palette=pal, ax=ax, order=[0,1,2])
+                           cut=0, ax=ax, order=[0,1,2], color=color)
     else:
         pass
         # if labels is not None:
@@ -265,10 +259,14 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             gcounts1 = g[var_s == c[0]].value_counts().reindex(np.arange(3), fill_value=0)
             gcounts2 = g[var_s == c[1]].value_counts().reindex(np.arange(3), fill_value=0)
             labels = [f"{v}\n({gcounts1[k]},{gcounts2[k]})" for k,v in enumerate(labels)]
+    ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels)
 
     if show_pval:
-        ax.text(0.05, 1, f"P = {pval:.2g}", va='top', ha='left', transform=ax.transAxes, fontsize=11)
+        if stats_s['slope'] > 0:
+            ax.text(0.05, 1, f"P = {stats_s['pval_nominal']:.2g}", va='top', ha='left', transform=ax.transAxes, fontsize=11)
+        else:
+            ax.text(0.05, 1, f"P = {stats_s['pval_nominal']:.2g}", va='top', ha='right', transform=ax.transAxes, fontsize=11)
 
     return ax
 
@@ -843,11 +841,11 @@ def check_labels(labels):
 
 
 def clustermap(df, Zx=None, Zy=None, cluster=True, aw=3, ah=3, lw=1, vmin=None, vmax=None, cmap=plt.cm.Blues,
-               origin='lower', dendrogram_pos='top', col_labels=None, row_labels=None,
+               norm=None, origin='lower', dendrogram_pos='top', col_labels=None, row_labels=None,
                fontsize=10, clabel='', cfontsize=10, label_colors=None, colorbar=True, colorbar_orientation='vertical',
                method='average', metric='euclidean', optimal_ordering=False, value_labels=False,
                show_xlabels=False, show_ylabels=False, tick_length=0, rotation=-45, ha='left', va='top',
-               tri=False, rasterized=False,
+               tri=False, rasterized=False, count_sort=False,
                show_frame=False, dl=1, dr=1, dt=0.2, lh=0.1, ls=0.01,
                db=1.5, dd=0.4, ds=0.03, ch=1, cw=0.175, dc=0.1, dtc=0):
     """"""
@@ -884,9 +882,9 @@ def clustermap(df, Zx=None, Zy=None, cluster=True, aw=3, ah=3, lw=1, vmin=None, 
         # colorbar
         if colorbar:
             if colorbar_orientation == 'vertical':
-                cax = fig.add_axes([(dl2+aw+dc)/fw, (db+ah-ch-dtc)/fh, cw/fw, ch/fh])
+                cax = fig.add_axes([(dl2+aw+dc)/fw, (db+ah-ch-dtc)/fh, cw/fw, ch/fh], label='Colorbar')
             else:
-                cax = fig.add_axes([(dl2+aw-ch-dtc)/fw, (db-cw-dc)/fh, ch/fw, cw/fh])
+                cax = fig.add_axes([(dl2+aw-ch-dtc)/fw, (db-cw-dc)/fh, ch/fw, cw/fh], label='Colorbar')
             axes.append(cax)
     else:
         dax = fig.add_axes([dl/fw, db/fh, aw/fw, dd/fh])
@@ -898,15 +896,16 @@ def clustermap(df, Zx=None, Zy=None, cluster=True, aw=3, ah=3, lw=1, vmin=None, 
 
     if Zx is not None:
         with plt.rc_context({'lines.linewidth': lw}):
-            z = hierarchy.dendrogram(Zx, ax=dax,  orientation='top', link_color_func=lambda k: 'k')
-        ix = df.columns[hierarchy.leaves_list(Zx)]
-        # ix = df.columns[z['leaves']]
+            z = hierarchy.dendrogram(Zx, ax=dax, count_sort=count_sort, orientation='top', link_color_func=lambda k: 'k')
+        ix = df.columns[z['leaves']]  # equivalent to hierarchy.leaves_list(Zx) if count_sort=False
     else:
         ix = df.columns
     dax.axis('off')
 
     if Zy is not None:
         iy = df.index[hierarchy.leaves_list(Zy)]
+    elif df.index.equals(df.columns):
+        iy = ix
     else:
         iy = df.index
 
@@ -931,7 +930,7 @@ def clustermap(df, Zx=None, Zy=None, cluster=True, aw=3, ah=3, lw=1, vmin=None, 
                 if not np.isnan(df.values[j,i]):
                     ax.text(i, j, f'{df.values[j,i]:.2f}', ha='center', va='center')
 
-    h = ax.imshow(df.values, origin=origin, cmap=cmap, vmin=vmin, vmax=vmax,
+    h = ax.imshow(df.values, origin=origin, cmap=cmap, vmin=vmin, vmax=vmax, norm=norm,
                   interpolation='none', rasterized=rasterized, aspect='auto')
     if show_xlabels:
         ax.set_xticks(np.arange(df.shape[1]))
@@ -989,7 +988,8 @@ def clustermap(df, Zx=None, Zy=None, cluster=True, aw=3, ah=3, lw=1, vmin=None, 
     # plot colorbar
     if colorbar:
         cbar = plt.colorbar(h, cax=cax, orientation=colorbar_orientation)
-        cax.locator_params(nbins=4)
+        if norm is None:
+            cax.locator_params(nbins=4)
         cbar.set_label(clabel, fontsize=cfontsize+1)
         cax.tick_params(labelsize=cfontsize)
 
