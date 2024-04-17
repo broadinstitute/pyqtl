@@ -213,7 +213,7 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             pal = sns.color_palette(split_colors)
             i = qtl_df.columns[2]
             sns.violinplot(x="genotype", y="phenotype", hue=i, hue_order=sorted(qtl_df[i].unique()),
-                           data=qtl_df, palette=pal, ax=ax, order=[0,1,2], scale='width', cut=0, dogde=False, linewidth=1, width=0.75)
+                           data=qtl_df, palette=pal, ax=ax, order=[0,1,2], density_norm='width', cut=0, linewidth=1, width=0.75)
             l = ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1), fontsize=8, handlelength=0.6, ncol=2, handletextpad=0.5, labelspacing=0.33)
             l.set_title(None)
         else:
@@ -259,8 +259,7 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             gcounts1 = g[var_s == c[0]].value_counts().reindex(np.arange(3), fill_value=0)
             gcounts2 = g[var_s == c[1]].value_counts().reindex(np.arange(3), fill_value=0)
             labels = [f"{v}\n({gcounts1[k]},{gcounts2[k]})" for k,v in enumerate(labels)]
-    ax.set_xticks(range(len(labels)))
-    ax.set_xticklabels(labels)
+    ax.set_xticks(range(len(labels)), labels)
 
     if show_pval:
         if stats_s['slope'] > 0:
