@@ -492,7 +492,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
             m = np.mean(xlim)
             for k,g in enumerate(gene[::-1]):
                 g = g.collapse()
-                g.plot(ax=gax, yoffset=k, max_intron=1e9, fc='k', ec='none', wx=0.1, scale=0.33, ylabels=None, clip_on=True)
+                g.plot(ax=gax, yoffset=k, max_intron=1e9, pc_color='k', nc_color='k', ec='none', wx=0.1, scale=0.33, ylabels=None, clip_on=True)
                 y = len(gene)-1-k
                 if gene_label_pos is None:
                     if gene[k].tss - m > m - gene[k].tss:

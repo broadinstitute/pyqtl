@@ -290,7 +290,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
                          labelspacing=0.2, borderaxespad=0, labels=gtlabels)
     for line in leg.get_lines():
         line.set_linewidth(1)
-    # axv[-1].add_artist(leg, clip_on=False)
+    axv[-1].add_artist(leg)#, clip_on=False)
 
     if variant_id is not None and title is None:
         axv[-1].set_title(f"{gene.name} :: {variant_id.split('_b')[0].replace('_',':',1).replace('_','-')}", fontsize=11)
@@ -384,8 +384,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     # need to plot last since this is plotted in a separate set of axes
     if junctions_df is not None:
         junctions_df = junctions_df.copy()
-        junctions_df['start'] = junctions_df.index.map(lambda x: int(x.split(':')[1].split('-')[0]))
-        junctions_df['end'] = junctions_df.index.map(lambda x: int(x.split(':')[1].split('-')[1]))
+        junctions_df['start'] = junctions_df.index.map(lambda x: int(x.split(':')[-1].split('-')[0]))
+        junctions_df['end'] = junctions_df.index.map(lambda x: int(x.split(':')[-1].split('-')[1]))
         for k,i in enumerate(sorder):
             s = pileup_dfs[0][i].copy()
             if colors is not None:
