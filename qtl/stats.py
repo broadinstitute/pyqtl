@@ -146,5 +146,5 @@ def bootstrap_pi1(pval, lambda_param=0.5, bounds=[2.5, 97.5], n=1000):
     if len(pi1_boot) > 0:
         ci = np.percentile(pi1_boot, bounds)
     else:
-        ci = np.array([np.NaN, np.NaN])
+        ci = np.array([np.nan, np.nan])
     return ci

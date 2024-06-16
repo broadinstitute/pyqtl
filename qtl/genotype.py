@@ -103,7 +103,7 @@ def get_genotypes_region(vcf, region, field='GT', dosages=True):
 
 
 def impute_mean(df, missing=lambda x: np.isnan(x), verbose=True):
-    """Row-wise mean imputation (in place). Missing values: np.NaN by default."""
+    """Row-wise mean imputation (in place). Missing values: np.nan by default."""
     if isinstance(df, pd.DataFrame):
         genotypes = df.values
     else:

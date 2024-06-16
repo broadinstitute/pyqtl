@@ -324,8 +324,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
 
     if plot_variants is not None:
         kwargs = {'ec':'k', 'lw':0.5, 's':20, 'marker':'^'}
-        h1 = ax.scatter(np.NaN, np.NaN, fc='tab:red', **kwargs, label='Lead')
-        h2 = ax.scatter(np.NaN, np.NaN, fc='tab:orange', **kwargs, label='Other')
+        h1 = ax.scatter(np.nan, np.nan, fc='tab:red', **kwargs, label='Lead')
+        h2 = ax.scatter(np.nan, np.nan, fc='tab:orange', **kwargs, label='Other')
         ax.legend(handles=[h1,h2], loc='lower left', title='CS variants',
                   handlelength=1, handletextpad=0.5, borderaxespad=0, bbox_to_anchor=(1.02, 0))
 

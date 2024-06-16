@@ -56,8 +56,8 @@ def get_genotypes_region(vcf, region, field='GT'):
     field_ix = s[0].split('\t')[8].split(':').index(field)
 
     if field == 'GT':
-        gt_map = {'0/0':0, '0/1':1, '1/1':2, './.':np.NaN,
-                  '0|0':0, '0|1':1, '1|0':1, '1|1':2, '.|.':np.NaN}
+        gt_map = {'0/0':0, '0/1':1, '1/1':2, './.':np.nan,
+                  '0|0':0, '0|1':1, '1|0':1, '1|1':2, '.|.':np.nan}
         s = [[gt_map[i.split(':', field_ix+1)[field_ix]] for i in si.split('\t')[9:]] for si in s]
     else:
         s = [[i.split(':', field_ix+1)[field_ix] for i in si.split('\t')[9:]] for si in s]
@@ -161,7 +161,7 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
 
     # sort variants by LD; plot high LD in front
     s = r2_s[x.index].sort_values().index
-    ax.scatter(x[s], y[s], c=r2_s[s].replace(np.NaN, -1), s=20, cmap=cmap, norm=norm, edgecolor='k', lw=0.25, clip_on=False)
+    ax.scatter(x[s], y[s], c=r2_s[s].replace(np.nan, -1), s=20, cmap=cmap, norm=norm, edgecolor='k', lw=0.25, clip_on=False)
 
     if highlight_ids is not None:
         ax.scatter(x[highlight_ids], y[highlight_ids], **highlight_args, clip_on=False)
@@ -301,10 +301,10 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
             # sort variants by LD; plot high LD in front
             if r2_s is not None:
                 s = r2_s[window_df.index].sort_values().index
-                r2 = r2_s[s].replace(np.NaN, -1)
+                r2 = r2_s[s].replace(np.nan, -1)
             elif 'r2' in pval_df:
                 s = pval_df.loc[window_df.index, 'r2'].sort_values(na_position='first').index
-                r2 = pval_df.loc[s, 'r2'].replace(np.NaN, -1)
+                r2 = pval_df.loc[s, 'r2'].replace(np.nan, -1)
             else:
                 s = window_df.index
                 r2 = pd.Series(-1, index=s)

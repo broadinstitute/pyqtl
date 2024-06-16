@@ -381,7 +381,7 @@ def plot_ld(ld_df, ld_threshold=0.1, s=0.25, alpha=1, yscale=3, xunit=1e6,
     ld_df.rename(index=variant_df['pos'], columns=variant_df['pos'], inplace=True)
     ld_df.columns.name = 'col'
     ld_df.index.name = 'row'
-    ld_df.values[np.triu_indices(ld_df.shape[0])] = np.NaN
+    ld_df.values[np.triu_indices(ld_df.shape[0])] = np.nan
 
     v = ld_df.stack().reset_index()
     v = v[v[0] >= ld_threshold]
@@ -915,11 +915,11 @@ def clustermap(df, Zx=None, Zy=None, cluster=True, aw=3, ah=3, lw=1, vmin=None, 
     if tri:
         if dendrogram_pos == 'top':
             if origin == 'upper':
-                df.values[np.tril_indices(df.shape[0], -1)] = np.NaN
+                df.values[np.tril_indices(df.shape[0], -1)] = np.nan
             else:
-                df.values[np.triu_indices(df.shape[0])] = np.NaN
+                df.values[np.triu_indices(df.shape[0])] = np.nan
         elif dendrogram_pos == 'bottom':
-            df.values[np.tril_indices(df.shape[0])] = np.NaN
+            df.values[np.tril_indices(df.shape[0])] = np.nan
 
     if value_labels:
         irange = np.arange(df.shape[0])
@@ -1020,8 +1020,8 @@ def hexdensity(x, y, bounds=None, bins='log', scale='log',
     y = y.copy()
     nanidx = (x == 0) | (y == 0)
     if any(nanidx):
-        x[nanidx] = np.NaN
-        y[nanidx] = np.NaN
+        x[nanidx] = np.nan
+        y[nanidx] = np.nan
 
     h = ax.hexbin(x, y, bins=bins, xscale=scale, yscale=scale, linewidths=0.1,
                   gridsize=gridsize, cmap=cmap, vmin=vmin, vmax=vmax, mincnt=1, zorder=1,

@@ -1193,7 +1193,7 @@ class Annotation(object):
                         m = bw.stats(g.chr, e.start_pos-1, e.end_pos, exact=True)[0]
                         # m = np.nanmean(bw.values(g.chr, e.start_pos-1, e.end_pos))
                     else:
-                        m = np.NaN
+                        m = np.nan
                     tm += m
                     e.mappability = m
                     # ex.append(m)
