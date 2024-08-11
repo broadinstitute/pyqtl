@@ -32,7 +32,7 @@ def normalize_quantiles(df):
 
     for i in range(n):
         # Get equivalence classes; unique values == 0
-        dupes = np.zeros(m, dtype=np.int)
+        dupes = np.zeros(m, dtype=int)
         for j in range(m-1):
             if M[Q[j,i],i] == M[Q[j+1,i],i]:
                 dupes[j+1] = dupes[j]+1
