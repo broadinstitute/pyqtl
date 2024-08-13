@@ -91,8 +91,8 @@ def samtools_depth(region_str, bam_s, bam_index_dir=None, flags='-aa -Q 255 -d 1
 
 def read_regtools_junctions(junctions_file, convert_positions=True):
     """
-    Read output from regtools junctions extract
-    and convert start/end positions to intron starts/ends.
+    Read output from regtools junctions extract and
+    convert start/end positions to intron starts/ends.
     """
     junctions_df = pd.read_csv(junctions_file, sep='\t', header=None,
                                usecols=[0, 1, 2, 4, 5, 10],
@@ -100,12 +100,16 @@ def read_regtools_junctions(junctions_file, convert_positions=True):
     if convert_positions:
         junctions_df['start'] += junctions_df['block_sizes'].apply(lambda x: int(x.split(',')[0])) + 1
         junctions_df['end'] -= junctions_df['block_sizes'].apply(lambda x: int(x.split(',')[1]))
-        junctions_df.index = junctions_df['chrom'] + ':' + junctions_df['start'].astype(str) + '-' + junctions_df['end'].astype(str) + ':' + junctions_df['strand']
+        junctions_df.index = (junctions_df['chrom'] + ':' + junctions_df['start'].astype(str)
+                              + '-' + junctions_df['end'].astype(str) + ':' + junctions_df['strand'])
     return junctions_df
 
 
 def regtools_wrapper(args):
-    """Wrapper for regtools junctions extract"""
+    """
+    Wrapper for regtools junctions extract.
+    Filters out secondary and supplementary alignments
+    """
     bam_file, region_str, sample_id, bam_index_dir, strand, user_project = args
     with tempfile.TemporaryDirectory() as tempdir:
         filtered_bam = os.path.join(tempdir, 'filtered.bam')
@@ -126,18 +130,20 @@ def regtools_wrapper(args):
     return junctions_df
 
 
-def regtools_extract_junctions(region_str, bam_s, bam_index_dir=None, strand=0, num_threads=12, user_project=None):
+def regtools_extract_junctions(region_str, bam_s, bam_index_dir=None, strand=0, num_threads=12,
+                               user_project=None, verbose=True):
     """
       region_str: string in 'chr:start-end' format
       bam_s: pd.Series or dict mapping sample_id->bam_path
       bam_index_dir: directory containing local copies of the BAM/CRAM indexes
     """
     junctions_df = []
+    n = len(bam_s)
     with mp.Pool(processes=num_threads) as pool:
         for k,df in enumerate(pool.imap(regtools_wrapper, [(i,region_str,j,bam_index_dir,strand,user_project) for j,i in bam_s.items()]), 1):
-            print(f'\r  * running regtools junctions extract on region {region_str} for bam {k}/{len(bam_s)}', end='')
+            if verbose:
+                print(f'\r  * running regtools junctions extract on region {region_str} for bam {k}/{n}', end='' if k < n else None)
             junctions_df.append(df['count'].rename(df.index.name))
-        print()
     junctions_df = pd.concat(junctions_df, axis=1).infer_objects().fillna(0).astype(np.int32)
     junctions_df.index.name = 'junction_id'
     return junctions_df
@@ -183,13 +189,15 @@ def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=No
 
 def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive', junctions_df=None,
          title=None, plot_variants=None, annot_track=None, max_intron=300, alpha=1, lw=0.5, junction_lw=2,
-         highlight_introns=None, highlight_introns2=None, shade_range=None, colors=None,
+         highlight_introns=None, highlight_introns2=None, shade_range=None, colors=None, junction_colors=None,
          ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
          pc_color='k', nc_color='darkgray', show_cds=True,
          dl=0.75, aw=4.5, dr=0.75, db=0.5, ah=1.5, dt=0.25, ds=0.2):
     """
       pileup_dfs:
     """
+    if junction_colors is None and colors is not None:
+        junction_colors = colors
 
     if isinstance(pileup_dfs, pd.DataFrame):
         pileup_dfs = [pileup_dfs]
@@ -232,12 +240,12 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         cycler_colors = [rgb2hex(i) for i in plt.cm.tab10(np.arange(10))]
     custom_cycler = cycler('color', cycler_colors)
 
-    fig = plt.figure(facecolor=(1,1,1), figsize=(fw,fh))
-    ax = fig.add_axes([dl/fw, (db+da+ds)/fh, aw/fw, ah/fh])
+    fig = plt.figure(facecolor='none', figsize=(fw,fh))
+    ax = fig.add_axes([dl/fw, (db+da+ds)/fh, aw/fw, ah/fh], facecolor='none')
     ax.set_prop_cycle(custom_cycler)
     axv = [ax]
     for i in range(1, num_pileups):
-        ax = fig.add_axes([dl/fw, (db+da+ds+i*(da2+ah))/fh, aw/fw, ah/fh], sharex=axv[0])
+        ax = fig.add_axes([dl/fw, (db+da+ds+i*(da2+ah))/fh, aw/fw, ah/fh], facecolor='none', sharex=axv[0])
         ax.set_prop_cycle(custom_cycler)
         axv.append(ax)
 
@@ -290,7 +298,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
                          labelspacing=0.2, borderaxespad=0, labels=gtlabels)
     for line in leg.get_lines():
         line.set_linewidth(1)
-    axv[-1].add_artist(leg)#, clip_on=False)
+    # axv[-1].add_artist(leg)#, clip_on=False)
 
     if variant_id is not None and title is None:
         axv[-1].set_title(f"{gene.name} :: {variant_id.split('_b')[0].replace('_',':',1).replace('_','-')}", fontsize=11)
@@ -388,8 +396,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         junctions_df['end'] = junctions_df.index.map(lambda x: int(x.split(':')[-1].split('-')[1]))
         for k,i in enumerate(sorder):
             s = pileup_dfs[0][i].copy()
-            if colors is not None:
-                ec = colors[i]
+            if junction_colors is not None:
+                ec = junction_colors[i]
             else:
                 ec = cycler_colors[k]
             gene.plot_junctions(ax, junctions_df, s, show_counts=False, align='minimum', count_col=i,

@@ -18,7 +18,7 @@ from . import map as qtl_map
 
 
 def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
-                 colorbar=False, ds=0.15, cw=0.12, ct=0, ch=None,
+                 colorbar=None, ds=0.15, cw=0.12, ct=0, ch=None,
                  margin_axes=None, mx=0.5, dx=0.15, my=0.5, dy=0.15):
     """
     """
@@ -36,13 +36,17 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
         axes.append(fig.add_axes([dl/fw, (db+ah+dy)/fh, aw/fw, my/fh], sharex=axes[0], facecolor='none', zorder=0))
     if margin_axes in ['x', 'both']:
         axes.append(fig.add_axes([(dl+aw+dx)/fw, db/fh, mx/fw, ah/fh], sharey=axes[0], facecolor='none', zorder=0))
-        dl += aw + dx + mx + ds
-    else:
-        dl += aw + ds
-    if colorbar:
+        if colorbar != 'horizontal':
+            dl += dx + mx
+    if colorbar == 'horizontal':
         if ch is None:
-            ch = 0.4*ah
-        axes.append(fig.add_axes([dl/fw, (db+ah-ch-ct)/fh, cw/fw, ch/fh], facecolor='none'))
+            ch = 0.4 * aw
+        axes.append(fig.add_axes([(dl+aw-ch)/fw, (db+ah+ds)/fh, ch/fw, cw/fh], facecolor='none'))
+    elif colorbar is not None and colorbar != False:  # vertical
+        if ch is None:
+            ch = 0.4 * ah
+        axes.append(fig.add_axes([(dl+aw+ds)/fw, (db+ah-ch-ct)/fh, cw/fw, ch/fh], facecolor='none'))
+
     if len(axes) == 1:
         axes = axes[0]
     return axes
@@ -79,7 +83,7 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
 
     for j in range(nr):
         for i in range(si(j), nc):
-            if n<ntot:
+            if n < ntot:
                 ax = fig.add_axes([(dl+i*(aw+dx))/fw, (db+(nr-j-1)*(ah+dy))/fh, aw/fw, ah/fh], facecolor='none',
                                   sharex=axes[0] if sharex and n>0 else None,
                                   sharey=axes[0] if sharey and n>0 else None)
