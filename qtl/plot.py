@@ -378,9 +378,9 @@ def plot_ld(ld_df, ld_threshold=0.1, s=0.25, alpha=1, yscale=3, xunit=1e6,
     variant_df['pos'] = pos[m]
 
     if start_pos is None:
-        start_pos = variant_df['pos'][0]
+        start_pos = variant_df['pos'].iloc[0]
     if end_pos is None:
-        end_pos = variant_df['pos'][-1]
+        end_pos = variant_df['pos'].iloc[-1]
 
     ld_df.rename(index=variant_df['pos'], columns=variant_df['pos'], inplace=True)
     ld_df.columns.name = 'col'
@@ -428,7 +428,7 @@ def plot_ld(ld_df, ld_threshold=0.1, s=0.25, alpha=1, yscale=3, xunit=1e6,
         ax.spines[s].set_visible(False)
     ax.set_yticks([])
 
-    ax.set_xlabel(f"Position on {variant_df['chr'][0]} (Mb)", fontsize=14)
+    ax.set_xlabel(f"Position on {variant_df['chr'].iloc[0]} (Mb)", fontsize=14)
     return ax
 
 
@@ -510,8 +510,8 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=No
             # ax.fill_between(x, 0.8*c/np.nanmax(c)+y0, y0,
             # ax.fill_between(x, 0.8*c/15+y0, y0,
             maxv = np.max(c)
-            ax.fill_between(x, 0.9*c/maxv + y0, y0,
-                            antialiased=False, linewidth=1, facecolor=track_colors.get(label, 'k'),
+            ax.fill_between(x, 0.9*c/maxv + y0, y0, antialiased=False, linewidth=1,
+                            facecolor=track_colors.get(label, 'k') if track_colors is not None else 'k',
                             clip_on=False, rasterized=True)
 
         ax.set_yticks(np.arange(ntracks))
@@ -546,7 +546,7 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=No
         # if lax is None:
         #     lax = ax
         for k,i in cohort_index_dict.items():
-            ax.scatter([], [], marker='s', c=[cmap(i)], label=f'{k}')
+            ax.scatter(np.nan, np.nan, marker='s', c=[cmap(i)], label=f'{k}')
         # if legend:
         ax.legend(loc='upper right', borderaxespad=None, bbox_to_anchor=(-0.05,1), handlelength=1, title='Taxonomy', fontsize=8)
         ax.set_ylim([ntracks-0.5, -0.5])
@@ -554,7 +554,8 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=No
 
     if tracks_dict is not None:
         plt.setp(ax.get_xticklabels(), visible=False)
-    axes[0].set_xlim([x[0], x[-1]])
+    if len(axes) > 0:
+        axes[0].set_xlim([x[0], x[-1]])
 
     if pip_df is not None:
         if pip_order is None:
@@ -565,10 +566,10 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=No
             cdf = pip_df[pip_df['trait_category'] == category_id]
             for i,(trait_id,gdf) in enumerate(cdf.groupby('trait_id'), i+1):
                 traits.append(trait_id)
-                fax.scatter(gdf['position']/1e6, [i-1]*gdf.shape[0],
-                           s=gdf['pip']*30, color=pip_colors[category_id], edgecolor='none')
+                fax.scatter(gdf['position']/1e6, [i-1]*gdf.shape[0], s=30*gdf['pip'],
+                            color=pip_colors.get(category_id, 'k') if pip_colors is not None else 'k', edgecolor='none')
             if cdf.shape[0] > 0:
-                fax.scatter([],[],s=20, color=pip_colors[category_id], label=category_id, edgecolor='none')
+                fax.scatter(np.nan, np.nan, s=20, color=pip_colors.get(category_id, 'k') if pip_colors is not None else 'k', label=category_id, edgecolor='none')
         fax.invert_yaxis()
         fax.set_yticks(np.arange(len(traits)))
 
@@ -589,7 +590,7 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=No
 
     if gene is not None:
         for k,g in enumerate(gene[::-1]):
-            g.plot(ax=gax, max_intron=1e9, fc='k', ec='none', yoffset=k, scale=0.33, clip_on=True)
+            g.plot(ax=gax, max_intron=1e9, pc_color='k', nc_color='k', ec='none', yoffset=k, scale=0.33, clip_on=True)
             gax.annotate(g.name, (g.end_pos, k),
                          xytext=(5,0), textcoords='offset points',
                          va='center', ha='left', fontsize=10)
@@ -606,7 +607,8 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=No
         format_plot(lax, fontsize=10)
         plot_ld(ld_df, cmap=plt.cm.Greys, s=ld_marker_size, clip_on=True, yscale=aw/ldh, ax=lax)
 
-    axes[-1].set_xlabel('Position on {} (Mb)'.format(chrom), fontsize=12)
+    if len(axes) > 0:
+        axes[-1].set_xlabel('Position on {} (Mb)'.format(chrom), fontsize=12)
 
     return axes
 
@@ -828,7 +830,7 @@ class CohortLabel(object):
         # prepare legend
         if self.cohort_s.dtype.name == 'category':
             for c in self.cohort_s.cat.categories:
-                ax.scatter([], [], c=[self.colors[c]], label=c, s=30, marker='s')
+                ax.scatter(np.nan, np.nan, c=[self.colors[c]], label=c, s=30, marker='s')
 
 
 def check_labels(labels):
