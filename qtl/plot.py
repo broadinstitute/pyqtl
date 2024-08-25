@@ -512,10 +512,10 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=No
             maxv = np.max(c)
             ax.fill_between(x, 0.9*c/maxv + y0, y0, antialiased=False, linewidth=1,
                             facecolor=track_colors.get(label, 'k') if track_colors is not None else 'k',
-                            clip_on=False, rasterized=True)
+                            clip_on=True, rasterized=True)
 
         ax.set_yticks(np.arange(ntracks))
-        ax.set_yticklabels(labels[::-1], fontsize=8, va='bottom')
+        ax.set_yticklabels([i.replace('_', ' ') for i in labels[::-1]], fontsize=8, va='bottom')
         ax.spines['left'].set_bounds((0, ntracks-1))
         ax.spines['left'].set_position(('outward', 6))
         format_plot(ax, fontsize=8, hide=['top', 'right', 'bottom'], y_offset=6)
@@ -605,10 +605,10 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=No
 
     if ld_df is not None:
         format_plot(lax, fontsize=10)
-        plot_ld(ld_df, cmap=plt.cm.Greys, s=ld_marker_size, clip_on=True, yscale=aw/ldh, ax=lax)
+        plot_ld(ld_df, start_pos=start_pos, end_pos=end_pos, cmap=plt.cm.Greys, s=ld_marker_size, clip_on=True, yscale=aw/ldh, ax=lax)
 
     if len(axes) > 0:
-        axes[-1].set_xlabel('Position on {} (Mb)'.format(chrom), fontsize=12)
+        axes[-1].set_xlabel(f"Position on {chrom} (Mb)", fontsize=12)
 
     return axes
 
