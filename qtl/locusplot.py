@@ -12,6 +12,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.patches as patches
+from cycler import cycler
 import seaborn as sns
 import argparse
 import subprocess
@@ -23,6 +24,7 @@ from collections.abc import Iterable
 
 from . import annotation
 from . import genotype as gt
+from . import plot
 
 
 def get_sample_ids(vcf):
@@ -243,8 +245,10 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
         fh += th + ds
     fig = plt.figure(figsize=(fw,fh))
     axes = [fig.add_axes([dl/fw, (fh-dt-ah)/fh, aw/fw, ah/fh])]
+    plot.format_plot(axes[-1], y_offset=6)
     for i in range(1,n):
         axes.append(fig.add_axes([dl/fw, (fh-dt-ah-i*(ah+ds))/fh, aw/fw, ah/fh], sharex=axes[0]))
+        plot.format_plot(axes[-1], y_offset=6)
     if tracks is not None:
         tax = fig.add_axes([dl/fw, (fh-dt-n*(ah+ds)-th)/fh, aw/fw, th/fh], sharex=axes[0])
     if gene[0] is not None:
@@ -316,11 +320,15 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
             minp = pval_df.loc[variant_id, 'pip']
             if 'cs_id' in pval_df:
                 pip_df = pval_df[pval_df['cs_id'].notnull()].copy()
-                pip_df['cs_id'] = pip_df['cs_id'].astype(int)
-                cs_colors = sns.color_palette('Set1', desat=0.66).as_hex()
+                cs_ix, cs_id = pd.factorize(pip_df['cs_id'])
+                if len(cs_id) < 10:
+                    cs_colors = sns.color_palette('Set1', desat=0.66).as_hex()
+                else:
+                    cs_colors = sns.color_palette('tab20b', desat=1).as_hex()
                 cs_cmap = mpl.colors.ListedColormap(cs_colors)
-                cs_norm = mpl.colors.BoundaryNorm(np.arange(1,cmap.N+1), cmap.N)
-                ax.scatter(pip_df['position'], pip_df['pip'], c=pip_df['cs_id'], s=22, ec='none', cmap=cs_cmap, norm=cs_norm, rasterized=rasterized)
+                cs_norm = mpl.colors.BoundaryNorm(np.arange(1, cs_cmap.N+1), cs_cmap.N)
+                ax.scatter(pip_df['position'], pip_df['pip'], c=pip_df['cs_id'].map(pd.Series(range(len(cs_id)), index=cs_id)),
+                           s=22, ec='none', cmap=cs_cmap, norm=cs_norm, rasterized=rasterized, clip_on=False)
             else:
                 raise NotImplementedError
 
@@ -355,7 +363,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
                 ax.scatter(minpos, minp, **select_args)
             elif minpos is not None:  # highlight lead variant for each CS
                 pip_df2 = pip_df.loc[pip_df.groupby('cs_id').apply(lambda x: x['pip'].idxmax())]
-                ax.scatter(pip_df2['position'], pip_df2['pip'], c=pip_df2['cs_id'],
+                ax.scatter(pip_df2['position'], pip_df2['pip'], c=pip_df2['cs_id'].map(pd.Series(range(len(cs_id)), index=cs_id)).iloc[0],
                            cmap=cs_cmap, norm=cs_norm, s=24, marker='D', ec='k', lw=0.25)
 
                 for i,r in pip_df2.iterrows():
