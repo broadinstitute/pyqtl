@@ -118,7 +118,7 @@ def get_rsid(id_lookup_table, variant_id):
     return rs_id[0]
 
 
-def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
+def compare_loci(pval_df1, pval_df2, r2_s, variant_id=None, rs_id=None,
                  highlight_ids=None, colorbar=True, ah=2, aw=2):
     """plot similar to LocusCompare (Liu et al., Nat Genet, 2019)"""
     assert pval_df1.index.equals(pval_df2.index)
@@ -155,7 +155,7 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
 
     if rs_id is not None:
         t = rs_id
-    else:
+    elif variant_id is not None:  # reformat variant ID
         t = variant_id.split('_b')[0].replace('_',':',1).replace('_','-')
 
     x = -np.log10(pval_df1['pval_nominal'])
@@ -168,10 +168,24 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id, rs_id=None,
     if highlight_ids is not None:
         ax.scatter(x[highlight_ids], y[highlight_ids], **highlight_args, clip_on=False)
 
-    x = -np.log10(pval_df1.loc[variant_id, 'pval_nominal'])
-    y = -np.log10(pval_df2.loc[variant_id, 'pval_nominal'])
-    ax.scatter(x, y, **select_args)
-    txt = ax.annotate(t, (x, y), xytext=(-5,5), textcoords='offset points', ha='right')
+    if variant_id is not None:
+        x = -np.log10(pval_df1.loc[variant_id, 'pval_nominal'])
+        y = -np.log10(pval_df2.loc[variant_id, 'pval_nominal'])
+        ax.scatter(x, y, **select_args)
+        txt = ax.annotate(t, (x, y), xytext=(-5,5), textcoords='offset points', ha='right')
+    else:  # annotate lead variants
+        v = pval_df1['pval_nominal'].idxmin()
+        x = -np.log10(pval_df1.loc[v, 'pval_nominal'])
+        y = -np.log10(pval_df2.loc[v, 'pval_nominal'])
+        t = v.split('_b')[0].replace('_',':',1).replace('_','-')
+        # ax.scatter(x, y, **select_args)
+        txt = ax.annotate(t, (x, y), xytext=(5,5), textcoords='offset points', ha='left')
+        v = pval_df2['pval_nominal'].idxmin()
+        x = -np.log10(pval_df1.loc[v, 'pval_nominal'])
+        y = -np.log10(pval_df2.loc[v, 'pval_nominal'])
+        t = v.split('_b')[0].replace('_',':',1).replace('_','-')
+        # ax.scatter(x, y, **select_args)
+        txt = ax.annotate(t, (x, y), xytext=(-5,5), textcoords='offset points', ha='right')
 
     ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True, min_n_ticks=4, nbins=5))
     ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True, min_n_ticks=4, nbins=5))
