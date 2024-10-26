@@ -377,7 +377,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
                 ax.scatter(minpos, minp, **select_args)
             elif minpos is not None:  # highlight lead variant for each CS
                 pip_df2 = pip_df.loc[pip_df.groupby('cs_id').apply(lambda x: x['pip'].idxmax())]
-                ax.scatter(pip_df2['position'], pip_df2['pip'], c=pip_df2['cs_id'].map(pd.Series(range(len(cs_id)), index=cs_id)).iloc[0],
+                ax.scatter(pip_df2['position'], pip_df2['pip'], c=pip_df2['cs_id'].map(pd.Series(range(len(cs_id)), index=cs_id)).values,
                            cmap=cs_cmap, norm=cs_norm, s=24, marker='D', ec='k', lw=0.25)
 
                 for i,r in pip_df2.iterrows():
