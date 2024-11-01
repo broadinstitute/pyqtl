@@ -51,6 +51,18 @@ def interval_union(intervals):
     return np.array(union)
 
 
+def load_fasta(fasta_file, header_parser=lambda x: x.split()[0]):
+    if fasta_file.endswith('.gz'):
+        opener = gzip.open(fasta_file, 'rt')
+    else:
+        opener = open(fasta_file, 'r')
+
+    with opener as f:
+        s = f.read().strip()
+    s = [i.split('\n', 1) for i in s.split('>')[1:]]
+    return {header_parser(i[0]):i[1].replace('\n','') for i in s}
+
+
 def get_sequence(fasta, region_str, concat=False):
     """Get sequence corresponding to region_str (chr:start-end) or list of region_str"""
     if isinstance(region_str, str):
@@ -918,10 +930,7 @@ class Annotation(object):
 
 
     def load_fasta(self, fasta_file):
-        with open(fasta_file) as f:
-            s = f.read().strip()
-        s = [i.split('\n', 1) for i in s.split('>')[1:]]
-        self.fasta_dict = {i[0].split()[0]:i[1].replace('\n','') for i in s}
+        self.fasta_dict = load_fasta(fasta_file)
 
 
     def query_genes(self, region_str):
