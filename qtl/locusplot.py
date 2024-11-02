@@ -205,16 +205,20 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id=None, rs_id=None,
 
 def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
                highlight_ids=None, credible_sets=None, show_lead=True, show_rsid=True,
-               tracks=None, track_colors=None, shared_only=True,
-               xlim=None, ymax=None, miny=5, sharey=None, labels=None, title=None, shade_range=None,
-               label_pos='left', gene_label_pos=None, chr_label_pos='bottom', window=200000, colorbar=True,
+               tracks=None, track_colors=None, shared_only=True, show_effect=False,
+               xlim=None, ymax=None, miny=5, sharey=None, labels=None, label_fontsize=12, title=None, shade_range=None,
+               label_pos='left', gene_label_pos=None, chr_label_pos='bottom', window=200000, colorbar=True, gene_scale=0.33,
                dl=0.75, aw=4, dr=0.75, db=0.5, ah=1.25, dt=0.25, ds=0.05, gh=0.2, th=1.5,
                single_ylabel=False, ylabel='-log$\mathregular{_{10}}$(p-value)', rasterized=False):
     """
       pvals: pd.DataFrame, or list of pd.DataFrame. Must contain 'pval_nominal' and 'position' columns.
+      variant_ids:
       gene: qtl.annotation.Gene, or list thereof
+      tracks:
+      track_colors:
       shared_only: only plot variants that are present in all inputs
       sharey: list of dataset indexes with shared ylim
+      show_effect: indicate effect direction of lead variant with up/down arrow
     """
 
     if isinstance(pvals, pd.DataFrame):
@@ -404,6 +408,26 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
             # if minp < -np.log10(pval_df['pval_nominal'].min())*0.8:
                 txt.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
 
+        if show_effect:
+            arrow_width = 0.025
+            arrow_height = 0.3
+            arrow_dr = 0.125
+            arrow_dt = 0.2
+            beta_col = [i for i in pval_df.columns if i in ('slope', 'beta', 'effect_size')]
+            assert len(beta_col) == 1, f"No effect size found"
+            beta_col = beta_col[0]
+            beta = pval_df.loc[variant_id, beta_col]
+            if beta > 0:
+                ax.arrow(1-arrow_dr/aw, 1-(arrow_height+arrow_dt)/ah, 0, arrow_height/ah,
+                         head_length=0.1/ah, width=arrow_width/aw,
+                         ec='none', fc='tab:green', transform=ax.transAxes)
+                ax.text(1-arrow_dr*1.66/aw, 1-(arrow_height/2+arrow_dt)/ah, r"$\beta$", va='center', ha='center', transform=ax.transAxes)
+            else:
+                ax.arrow(1-arrow_dr/aw, 1-(arrow_dt-0.1)/ah, 0, -arrow_height/ah,
+                         head_length=0.1/ah, width=arrow_width/aw,
+                         ec='none', fc='tab:red', transform=ax.transAxes)
+                ax.text(1-arrow_dr*1.66/aw, 1-(arrow_dt-0.1+arrow_height/2)/ah, r"$\beta$", va='center', ha='center', transform=ax.transAxes)
+
         ax.margins(y=0.2)
         if 'pip' in pval_df:
             ax.set_ylim([0, ax.get_ylim()[1]])
@@ -417,10 +441,10 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
     if labels is not None:
         if label_pos == 'left':
             for ax,t in zip(axes, labels):
-                ax.text(0.02, 0.925, t, transform=ax.transAxes, va='top', ha='left', fontsize=12)
+                ax.text(0.02, 0.925, t, transform=ax.transAxes, va='top', ha='left', fontsize=label_fontsize)
         elif label_pos == 'right':
             for ax,t in zip(axes, labels):
-                ax.text(0.98, 0.925, t, transform=ax.transAxes, va='top', ha='right', fontsize=12)
+                ax.text(0.98, 0.925, t, transform=ax.transAxes, va='top', ha='right', fontsize=label_fontsize)
 
     if single_ylabel:
         # for ax in axes:
@@ -430,8 +454,8 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
     else:
         for k,ax in enumerate(axes):
             ax.set_ylabel(ylabels[k], fontsize=12)#, labelpad=15)
-            if 'p-value' in ylabels[k]:
-                ax.yaxis.set_label_coords(-0.07*4/aw, 0.5)
+            # if 'p-value' in ylabels[k]:
+            #     ax.yaxis.set_label_coords(-0.07*4/aw, 0.5)
 
     for ax in axes:
         ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True, min_n_ticks=3, nbins=4))
@@ -487,12 +511,12 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
         axes[-1].spines['bottom'].set_visible(True)
         axes[-1].tick_params(axis='x', pad=2)
         axes[-1].xaxis.labelpad = 8
-        axes[-1].set_xlabel(f'Position on {chrom} (Mb)', fontsize=14)
+        axes[-1].set_xlabel(f'Position on {chrom} (Mb)', fontsize=12)
         xt = axes[-1].get_xticks()
         axes[-1].set_xticks(xt)
         axes[-1].set_xticklabels(xt/1e6)
         axes[-1].set_xlim(xlim)
-    else:   # add gene model
+    else:  # add gene model
         #  plot gene model and annotate
         if gene[0].end_pos < xlim[0]:
             x = gh/aw/2
@@ -512,22 +536,24 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
             gax.text(1 - gh/aw/2*1.5, 0.5, txt, va='center', ha='right', transform=gax.transAxes)
         else:
             m = np.mean(xlim)
-            for k,g in enumerate(gene[::-1]):
-                g = g.collapse()
-                g.plot(ax=gax, yoffset=k, max_intron=1e9, pc_color='k', nc_color='k', ec='none', wx=0.1, scale=0.33, ylabels=None, clip_on=True)
-                y = len(gene)-1-k
-                if gene_label_pos is None:
-                    if gene[k].tss - m > m - gene[k].tss:
-                        gax.annotate(gene[k].name, (np.minimum(gene[k].end_pos, xlim[1]), y), xytext=(5,0), textcoords='offset points', va='center', ha='left')
-                    else:
-                        gax.annotate(gene[k].name, (np.maximum(gene[k].start_pos, xlim[0]), y), xytext=(-5,0), textcoords='offset points', va='center', ha='right')
-                elif gene_label_pos == 'left':
-                    gax.annotate(gene[k].name, (np.maximum(gene[k].start_pos, xlim[0]), y), xytext=(-5,0), textcoords='offset points', va='center', ha='right')
-                elif gene_label_pos == 'right':
-                    gax.annotate(gene[k].name, (np.minimum(gene[k].end_pos, xlim[1]), y), xytext=(5,0), textcoords='offset points', va='center', ha='left')
+            for k,g in enumerate(gene):
+                if g is not None:
+                    g = g.collapse()
+                    y = len(gene)-1-k  # revert position
+                    g.plot(ax=gax, yoffset=y, max_intron=1e9, pc_color='k', nc_color='k', ec='none', wx=0.1, scale=gene_scale, ylabels=None, clip_on=True)
+                    if gene_label_pos is None:
+                        if g.tss - m > m - g.tss:
+                            gax.annotate(g.name, (np.minimum(g.end_pos, xlim[1]), y), xytext=(5,0), textcoords='offset points', va='center', ha='left')
+                        else:
+                            gax.annotate(g.name, (np.maximum(g.start_pos, xlim[0]), y), xytext=(-5,0), textcoords='offset points', va='center', ha='right')
+                    elif gene_label_pos == 'left':
+                        gax.annotate(g.name, (np.maximum(g.start_pos, xlim[0]), y), xytext=(-5,0), textcoords='offset points', va='center', ha='right')
+                    elif gene_label_pos == 'right':
+                        gax.annotate(g.name, (np.minimum(g.end_pos, xlim[1]), y), xytext=(5,0), textcoords='offset points', va='center', ha='left')
+            gax.set_ylim([-0.5, len(gene)-0.5])
 
         if chr_label_pos == 'bottom':
-            gax.set_xlabel(f'Position on {chrom} (Mb)', fontsize=14)
+            gax.set_xlabel(f'Position on {chrom} (Mb)', fontsize=12)
         else:
             plt.setp(gax.get_xticklabels(), visible=False)
             for line in gax.xaxis.get_ticklines():
@@ -550,7 +576,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
     if chr_label_pos!='bottom':
         axes[0].xaxis.tick_top()
         axes[0].xaxis.set_label_position('top')
-        axes[0].set_xlabel(f'Position on {chrom} (Mb)', fontsize=14)
+        axes[0].set_xlabel(f'Position on {chrom} (Mb)', fontsize=12)
         axes[0].spines['top'].set_visible(True)
         axes[0].tick_params(axis='x', pad=2)
         axes[0].xaxis.labelpad = 8
