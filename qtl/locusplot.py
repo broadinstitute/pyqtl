@@ -204,11 +204,11 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id=None, rs_id=None,
 
 
 def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
-               highlight_ids=None, credible_sets=None, show_lead=True, show_rsid=True,
+               highlight_ids=None, credible_sets=None, show_lead=True, show_rsid=True, label_first_only=False,
                tracks=None, track_colors=None, shared_only=True, show_effect=False,
                xlim=None, ymax=None, miny=5, sharey=None, labels=None, label_fontsize=12, title=None, shade_range=None,
                label_pos='left', gene_label_pos=None, chr_label_pos='bottom', window=200000, colorbar=True, gene_scale=0.33,
-               dl=0.75, aw=4, dr=0.75, db=0.5, ah=1.25, dt=0.25, ds=0.05, gh=0.2, th=1.5,
+               dl=0.75, aw=4, dr=0.75, db=0.5, ah=1.25, dt=0.25, ds=0.1, gh=0.2, th=1.5,
                single_ylabel=False, ylabel='-log$\mathregular{_{10}}$(p-value)', rasterized=False):
     """
       pvals: pd.DataFrame, or list of pd.DataFrame. Must contain 'pval_nominal' and 'position' columns.
@@ -261,16 +261,16 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
         gh = 0
     if tracks is not None:
         fh += th + ds
-    fig = plt.figure(figsize=(fw,fh))
+    fig = plt.figure(figsize=(fw,fh), facecolor='none')
     axes = [fig.add_axes([dl/fw, (fh-dt-ah)/fh, aw/fw, ah/fh])]
     plot.format_plot(axes[-1], y_offset=6)
     for i in range(1,n):
-        axes.append(fig.add_axes([dl/fw, (fh-dt-ah-i*(ah+ds))/fh, aw/fw, ah/fh], sharex=axes[0]))
+        axes.append(fig.add_axes([dl/fw, (fh-dt-ah-i*(ah+ds))/fh, aw/fw, ah/fh], sharex=axes[0], facecolor='none'))
         plot.format_plot(axes[-1], y_offset=6)
     if tracks is not None:
-        tax = fig.add_axes([dl/fw, (fh-dt-n*(ah+ds)-th)/fh, aw/fw, th/fh], sharex=axes[0])
+        tax = fig.add_axes([dl/fw, (fh-dt-n*(ah+ds)-th)/fh, aw/fw, th/fh], sharex=axes[0], facecolor='none')
     if gene[0] is not None:
-        gax = fig.add_axes([dl/fw, (db)/fh, aw/fw, gh/fh], sharex=axes[0])
+        gax = fig.add_axes([dl/fw, (db)/fh, aw/fw, gh/fh], sharex=axes[0], facecolor='none')
 
     if xlim is None:
         xlim = np.array([pos-window, pos+window])
@@ -294,8 +294,8 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
                                        ticks=bounds[1:],
                                        spacing='proportional',
                                        orientation='vertical')
-        cax.set_title('r$\mathregular{^2}$', fontsize=12)
         cax.set_ylim([0,1])
+        cax.set_title('r$\mathregular{^2}$', fontsize=12)
 
     # common set of variants
     common_ix = pvals[0].index
@@ -400,7 +400,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
             else:
                 t = variant_id.split('_b')[0].replace('_',':',1).replace('_','-')
 
-            if show_rsid and minpos is not None and 'pip' not in pval_df:  # text label
+            if show_rsid and minpos is not None and 'pip' not in pval_df and (k == 0 or not label_first_only):  # text label
                 if (minpos-xlim[0])/(xlim[1]-xlim[0]) < 0.55:  # right
                     txt = ax.annotate(t, (minpos, minp), xytext=(5,5), textcoords='offset points')
                 else:
