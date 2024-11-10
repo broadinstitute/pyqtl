@@ -1072,16 +1072,17 @@ class Annotation(object):
         return self.cassette_transcripts
 
 
-    def get_junctions(self, min_intron_length=0):
+    def get_junctions(self, min_intron_length=0, exclude_biotypes=[]):
         """Return DataFrame with junction information: chr, intron_start, intron_end"""
         junctions = []
         for g in self.genes:
             for t in g.transcripts:
-                for i in range(len(t.exons)-1):
-                    if g.strand == '+':
-                        junctions.append([g.chr, t.exons[i].end_pos+1, t.exons[i+1].start_pos-1, g.strand, g.id])
-                    else:
-                        junctions.append([g.chr, t.exons[i+1].end_pos+1, t.exons[i].start_pos-1, g.strand, g.id])
+                if t.type not in exclude_biotypes:
+                    for i in range(len(t.exons)-1):
+                        if g.strand == '+':
+                            junctions.append([g.chr, t.exons[i].end_pos+1, t.exons[i+1].start_pos-1, g.strand, g.id])
+                        else:
+                            junctions.append([g.chr, t.exons[i+1].end_pos+1, t.exons[i].start_pos-1, g.strand, g.id])
         df = pd.DataFrame(junctions, columns=['chr', 'intron_start', 'intron_end', 'strand', 'gene_id']).drop_duplicates()
         # sort within chrs
         df = df.groupby('chr', sort=False).apply(lambda x: x.sort_values(['intron_start', 'intron_end'])).reset_index(drop=True)
