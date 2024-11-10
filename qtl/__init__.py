@@ -1,2 +1,3 @@
-__version__ = "0.1.10"
+import importlib.metadata
+__version__ = importlib.metadata.version(__name__)
 from .core import *
