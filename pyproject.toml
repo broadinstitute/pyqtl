@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qtl"
+version = "0.1.10"
+dependencies = [
+    "bx-python",
+    "pyBigWig",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "scipy",
+    "seaborn",
+]
+authors = [
+    {name = "Francois Aguet", email = "francois@broadinstitute.org"}
+]
+maintainers = [
+    {name = "Francois Aguet", email = "francois@broadinstitute.org"}
+]
+description = "Utilities for analyzing and visualizing QTL data"
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["Quantitative trait loci"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+[project.urls]
+Repository = "https://github.com/broadinstitute/pyqtl.git"
