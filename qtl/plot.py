@@ -571,7 +571,7 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=No
             traits = []
             for category_id in pip_order:
                 cdf = df[df['trait_category'] == category_id]
-                for i,(trait_id,gdf) in enumerate(cdf.groupby('trait_id'), i+1):
+                for i,(trait_id,gdf) in enumerate(cdf.groupby('trait_id', observed=True), i+1):
                     traits.append(trait_id)
                     fax.scatter(gdf['position']/1e6, [i-1]*gdf.shape[0], s=30*gdf['pip'],
                                 color=pip_colors.get(category_id, 'k') if pip_colors is not None else 'k', edgecolor='none', clip_on=False)
