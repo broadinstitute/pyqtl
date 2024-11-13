@@ -435,7 +435,7 @@ def plot_ld(ld_df, ld_threshold=0.1, s=0.25, alpha=1, yscale=3, xunit=1e6,
 def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=None,
                        track_colors=None, labels=None, order=None,
                        pip_df=None, pip_order=None, pip_colors=None, pip_legend=False,
-                       gene=None, ld_marker_size=1, aw=6, ah=4, dl=1.5, dr=1.5, ph=None, gh=0.15):
+                       gene=None, ld_marker_size=1, aw=6, ah=4, dl=1.5, dr=1.5, ph=0.1, gh=0.15):
     """
     Visualization of genetic locus, combining coverage tracks (e.g., ATAC-seq),
     variants (e.g., fine-mapped QTLs), genes/transcripts, and LD.
@@ -465,22 +465,28 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=No
     db = 0.5
     ldh = 1  # LD plot
     ds0 = 0
-    ds = 0
+    ds = 0.1
     if pip_df is None:
         ph = 0
-    elif ph is None:
-        ph = 0.1*len(pip_df['trait_category'].unique())
+    elif isinstance(pip_df, pd.DataFrame):
+        pip_df = [pip_df]
+    pah = [ph*df['trait_id'].nunique() for df in pip_df]
+
     dt = 0.25
     fw = dl + aw + dr
-    fh = db + ldh + ds0 + gh + ds +ph + ds + ah + dt
+    fh = db + ldh + ds0 + gh + ds + sum(pah) + ds*(len(pah)-1) + ds + ah + dt
     fig = plt.figure(figsize=(fw,fh))
     axes = []
     if tracks_dict is not None:
-        ax =  fig.add_axes([dl/fw, (db+ldh+ds0+gh+ds+ph+ds)/fh, aw/fw, ah/fh], facecolor='none')
+        ax =  fig.add_axes([dl/fw, (db+ldh+ds0+gh+ds+sum(pah)+len(pah)*ds)/fh, aw/fw, ah/fh], facecolor='none')
         axes.append(ax)
     if pip_df is not None:
-        fax = fig.add_axes([dl/fw, (db+ldh+ds0+gh+ds)/fh, aw/fw, ph/fh], facecolor='none', sharex=axes[0] if len(axes)>0 else None)
-        axes.append(fax)
+        faxes = []
+        for k,h in enumerate(pah):
+            fax = fig.add_axes([dl/fw, (db+ldh+ds0+gh+ds+(len(pah)-1-k)*ds+sum(pah[k+1:]))/fh, aw/fw, h/fh],
+                               facecolor='none', sharex=axes[0] if len(axes)>0 else None)
+            faxes.append(fax)
+            axes.append(fax)
     if gene is not None:
         gax = fig.add_axes([dl/fw, (db+ldh+ds0)/fh, aw/fw, gh/fh], facecolor='none')
         axes.append(gax)
@@ -558,35 +564,37 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=No
         axes[0].set_xlim([x[0], x[-1]])
 
     if pip_df is not None:
-        if pip_order is None:
-            pip_order = pip_df['trait_category'].unique()
-        i = 0
-        traits = []
-        for category_id in pip_order:
-            cdf = pip_df[pip_df['trait_category'] == category_id]
-            for i,(trait_id,gdf) in enumerate(cdf.groupby('trait_id'), i+1):
-                traits.append(trait_id)
-                fax.scatter(gdf['position']/1e6, [i-1]*gdf.shape[0], s=30*gdf['pip'],
-                            color=pip_colors.get(category_id, 'k') if pip_colors is not None else 'k', edgecolor='none')
-            if cdf.shape[0] > 0:
-                fax.scatter(np.nan, np.nan, s=20, color=pip_colors.get(category_id, 'k') if pip_colors is not None else 'k', label=category_id, edgecolor='none')
-        fax.invert_yaxis()
-        fax.set_yticks(np.arange(len(traits)))
+        for k, df in enumerate(pip_df):
+            fax = faxes[k]
+            pip_order = df['trait_category'].unique()  # TODO: add back as option?
+            i = 0
+            traits = []
+            for category_id in pip_order:
+                cdf = df[df['trait_category'] == category_id]
+                for i,(trait_id,gdf) in enumerate(cdf.groupby('trait_id'), i+1):
+                    traits.append(trait_id)
+                    fax.scatter(gdf['position']/1e6, [i-1]*gdf.shape[0], s=30*gdf['pip'],
+                                color=pip_colors.get(category_id, 'k') if pip_colors is not None else 'k', edgecolor='none', clip_on=False)
+                if cdf.shape[0] > 0:
+                    fax.scatter(np.nan, np.nan, s=20, color=pip_colors.get(category_id, 'k') if pip_colors is not None else 'k', label=category_id, edgecolor='none')
+            fax.invert_yaxis()
+            fax.set_yticks(np.arange(len(traits)))
 
-        fax.spines['bottom'].set_visible(False)
-        fax.spines['top'].set_visible(False)
-        fax.spines['left'].set_position(('outward', 6))
-        fax.spines['left'].set_bounds((0, i-1))
-        fax.spines['right'].set_visible(False)
-        fax.set_xlim([x[0], x[-1]])
-        fax.set_yticklabels(traits, fontsize=7)
-        plt.setp(fax.get_xticklabels(), visible=False)
-        for line in fax.xaxis.get_ticklines():
-            line.set_markersize(0)
-            line.set_markeredgewidth(0)
+            fax.spines['bottom'].set_visible(False)
+            fax.spines['top'].set_visible(False)
+            fax.spines['left'].set_position(('outward', 6))
+            fax.spines['left'].set_bounds((0, i-1))
+            fax.spines['right'].set_visible(False)
+            fax.set_xlim([x[0], x[-1]])
+            fax.set_yticklabels(traits, fontsize=7)
+            plt.setp(fax.get_xticklabels(), visible=False)
+            for line in fax.xaxis.get_ticklines():
+                line.set_markersize(0)
+                line.set_markeredgewidth(0)
 
-        if pip_legend:
-            fax.legend(loc='upper left', borderaxespad=0, bbox_to_anchor=(1.01,1), fontsize=8, handlelength=0.75, labelspacing=0)
+            if pip_legend == True:
+                fax.legend(loc='upper left', borderaxespad=0, borderpad=0.25, bbox_to_anchor=(1.01,1), fontsize=8, handlelength=0.75, handletextpad=0.5, labelspacing=0)
+
 
     if gene is not None:
         for k,g in enumerate(gene[::-1]):
@@ -978,7 +986,7 @@ def clustermap(df, Zx=None, Zy=None, cluster=True, aw=3, ah=3, lw=1, vmin=None, 
         xlim = ax.get_xlim()
         b = xlim[1] - s*np.diff(xlim)
         ax.set_xlim(xlim)
-        ax.scatter([b]*df.shape[1], np.arange(df.shape[1]), s=40, c=label_colors[hierarchy.leaves_list(Zx)], clip_on=False)
+        ax.scatter([b]*df.shape[1], np.arange(df.shape[1]), s=40, c=label_colors.iloc[hierarchy.leaves_list(Zx)], clip_on=False)
         ax.set_yticks(np.arange(df.shape[0]))
         ax.set_yticklabels(iy, fontsize=fontsize)
         ax.tick_params(axis='y', pad=12, length=0)
