@@ -521,7 +521,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
         if gene[0].end_pos < xlim[0]:
             x = gh/aw/2
             v = np.array([[x,0.2], [x-0.8*gh/aw, 0.5], [x,0.8]])
-            polygon = patches.Polygon(v, True, color='k', transform=gax.transAxes, clip_on=False)
+            polygon = patches.Polygon(v, closed=True, color='k', transform=gax.transAxes, clip_on=False)
             gax.add_patch(polygon)
             txt = f'{gene[0].name} (~{(pos-gene[0].tss)/1e6:.1f}Mb)'
             gax.set_ylim([-1,1])
@@ -529,7 +529,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
         elif gene[0].start_pos > xlim[1]:
             x = 1 - gh/aw/2
             v = np.array([[x,0.2], [x+0.8*gh/aw, 0.5], [x,0.8]])
-            polygon = patches.Polygon(v, True, color='k', transform=gax.transAxes, clip_on=False)
+            polygon = patches.Polygon(v, closed=True, color='k', transform=gax.transAxes, clip_on=False)
             gax.add_patch(polygon)
             txt = f'{gene[0].name} (~{(gene[0].tss-pos)/1e6:.1f}Mb)'
             gax.set_ylim([-1,1])
