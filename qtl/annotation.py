@@ -261,8 +261,10 @@ class Gene(object):
         self.end_pos = end_pos
         if strand == '+':
             self.tss = start_pos
+            self.tes = end_pos
         else:
             self.tss = end_pos
+            self.tes = start_pos
         self.transcripts = []
         self.exclude_biotypes = []
         self.mappability = None
@@ -1252,8 +1254,10 @@ class Annotation(object):
 
     def write_bed(self, bed_path, overwrite=False):
         """
-        Write to BED format.
-        Columns: chr, start, end, gff3_attributes (ID, name, biotype), score (1000), strand, thick_start, thick_end, ., #exons, sizes, starts
+        Write to BED format, with GFF3 attributes for optimal display in IGV (transcript
+        names are shown on gene model, with remaining attributes shown on overlay/hover).
+        Columns: chr, start, end, gff3_attributes (ID, name, biotype), score (1000),
+                 strand, thick_start, thick_end, ., num_exons, sizes, starts
         """
         if not os.path.exists(bed_path) or overwrite:
             with open(bed_path, 'w') as bed:
