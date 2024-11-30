@@ -206,7 +206,7 @@ def compare_loci(pval_df1, pval_df2, r2_s, variant_id=None, rs_id=None,
 def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
                highlight_ids=None, credible_sets=None, show_lead=True, show_rsid=True, label_first_only=False,
                tracks=None, track_colors=None, shared_only=True, show_effect=False,
-               xlim=None, ymax=None, miny=5, sharey=None, labels=None, label_fontsize=12, title=None, shade_range=None,
+               xlim=None, ymax=None, miny=5, sharey=None, labels=None, label_fontsize=12, title=None, shade_range=None, shade_color='#cecece',
                label_pos='left', gene_label_pos=None, chr_label_pos='bottom', window=200000, colorbar=True, gene_scale=0.33,
                dl=0.75, aw=4, dr=0.75, db=0.5, ah=1.25, dt=0.25, ds=0.1, gh=0.2, th=1.5,
                single_ylabel=False, ylabel='-log$\mathregular{_{10}}$(p-value)', rasterized=False):
@@ -270,7 +270,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
     if tracks is not None:
         tax = fig.add_axes([dl/fw, (fh-dt-n*(ah+ds)-th)/fh, aw/fw, th/fh], sharex=axes[0], facecolor='none')
     if gene[0] is not None:
-        gax = fig.add_axes([dl/fw, (db)/fh, aw/fw, gh/fh], sharex=axes[0], facecolor='none')
+        gax = fig.add_axes([dl/fw, (db)/fh, aw/fw, gh/fh], sharex=axes[0], facecolor='none', label='Gene')
 
     if xlim is None:
         xlim = np.array([pos-window, pos+window])
@@ -436,7 +436,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
         else:
             ax.set_ylim([0, ymax[k]])
         if shade_range is not None:  # highlight subregion with gray background
-            ax.add_patch(patches.Rectangle((shade_range[0], 0), np.diff(shade_range), ax.get_ylim()[1], facecolor=[0.66]*3, zorder=-10))
+            ax.add_patch(patches.Rectangle((shade_range[0], 0), np.diff(shade_range)[0], ax.get_ylim()[1], facecolor=shade_color, zorder=-10))
 
     if labels is not None:
         if label_pos == 'left':
