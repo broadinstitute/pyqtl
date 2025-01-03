@@ -174,9 +174,14 @@ class Transcript(object):
                 np.all([i == j for i,j in zip(self.exons, other.exons)]))
 
     def get_cds_ranges(self, include_stop=True):
-        cds_ranges = [e.CDS for e in self.exons if hasattr(e, 'CDS')]
+        cds_ranges = [list(e.CDS) for e in self.exons if hasattr(e, 'CDS')]
         if cds_ranges and include_stop and len(self.stop_codon) > 0:
-            cds_ranges.append(self.stop_codon[::2])
+            if self.gene.strand == '+':
+                assert cds_ranges[-1][1] == self.stop_codon[0] - 1
+                cds_ranges[-1][1] = int(self.stop_codon[-1])
+            else:
+                assert cds_ranges[-1][0] == self.stop_codon[-1] + 1
+                cds_ranges[-1][0] = int(self.stop_codon[0])
         return cds_ranges
 
     def get_cds_coords(self, include_stop=True):
