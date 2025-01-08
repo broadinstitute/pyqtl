@@ -705,7 +705,7 @@ class Gene(object):
             line.set_markeredgewidth(0)
 
     def plot_junctions(self, ax, junction_df, coverage_s, show_counts=True, count_col='count',
-                       align='both', h=0.3, lw=3, lw_fct=np.sqrt, ec=[0.6]*3, clip_on=True):
+                       align='both', h=0.3, lw=3, lw_fct=np.sqrt, ec=[0.6]*3, alpha=1, clip_on=True):
         """
         Plot junctions ("sashimi" plot).
 
@@ -742,7 +742,7 @@ class Gene(object):
                 x1_t[1] = ymin
                 x2_t[1] = ymin
 
-            _plot_arc(ax0, x1_t, x2_t, h*ys, lw=lw * lw_fct(r[count_col]/junction_df[count_col].max()), ec=ec, clip_on=clip_on)
+            _plot_arc(ax0, x1_t, x2_t, h*ys, lw=lw * lw_fct(r[count_col]/junction_df[count_col].max()), ec=ec, alpha=alpha, clip_on=clip_on)
 
             if show_counts:
                 x0_t = (x1_t + x2_t) / 2
@@ -750,11 +750,11 @@ class Gene(object):
                 txt.set_bbox(dict(facecolor='w', alpha=0.75, edgecolor='none', boxstyle="round,pad=0.1"))
 
 
-def _plot_arc(ax, x1, x2, h, lw=1, ec='k', clip_on=True):
+def _plot_arc(ax, x1, x2, h, lw=1, ec='k', alpha=1, clip_on=True):
     x0 = (x1 + x2) / 2
     d = x2 - x1
     t = np.arctan(d[1]/d[0])
-    ax.add_patch(patches.Arc(x0, d[0] / np.cos(t), h, lw=lw, ec=ec, clip_on=clip_on,
+    ax.add_patch(patches.Arc(x0, d[0] / np.cos(t), h, lw=lw, ec=ec, alpha=alpha, clip_on=clip_on,
                              angle=t*180/np.pi, theta1=0, theta2=180))
 
 
