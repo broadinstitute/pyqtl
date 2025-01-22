@@ -19,7 +19,7 @@ from . import map as qtl_map
 
 def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
                  colorbar=None, ds=0.15, cw=0.12, ct=0, ch=None,
-                 margin_axes=None, mx=0.5, dx=0.15, my=0.5, dy=0.15):
+                 margin_axes=None, mx=0.5, dx=0.15, my=0.5, dy=0.15, polar=False):
     """
     """
     dl, dr = xspace
@@ -31,7 +31,7 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
     if margin_axes in ['y', 'both']:
         fh += dy + my
     fig = plt.figure(facecolor='none', figsize=(fw,fh))
-    axes = [fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh], facecolor='none', zorder=1)]
+    axes = [fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh], facecolor='none', zorder=1, polar=polar)]
     if margin_axes in ['y', 'both']:
         axes.append(fig.add_axes([dl/fw, (db+ah+dy)/fh, aw/fw, my/fh], sharex=axes[0], facecolor='none', zorder=0))
     if margin_axes in ['x', 'both']:
@@ -60,7 +60,8 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
 #     ax.tick_params(axis='both', which='both', direction='out', labelsize=fontsize)
 
 def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
-               x_offset=6, y_offset=6, margins=None,
+               x_offset=6, y_offset=6, margins=None, polar=False,
+               background_axes=False,
                dl=0.5, aw=2, dx=0.75, dr=0.25,
                db=0.5, ah=2, dy=0.75, dt=0.25,
                colorbar=None, ds=0.15, cw=0.15, ct=0, ch=None,
@@ -84,10 +85,11 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
     for j in range(nr):
         for i in range(si(j), nc):
             if n < ntot:
-                ax = fig.add_axes([(dl+i*(aw+dx))/fw, (db+(nr-j-1)*(ah+dy))/fh, aw/fw, ah/fh], facecolor='none',
+                ax = fig.add_axes([(dl+i*(aw+dx))/fw, (db+(nr-j-1)*(ah+dy))/fh, aw/fw, ah/fh], facecolor='none', polar=polar,
                                   sharex=axes[0] if sharex and n>0 else None,
                                   sharey=axes[0] if sharey and n>0 else None)
-                format_plot(ax, fontsize=fontsize, hide=hide, x_offset=x_offset, y_offset=y_offset)
+                if not polar:
+                    format_plot(ax, fontsize=fontsize, hide=hide, x_offset=x_offset, y_offset=y_offset)
                 ax.margins(margins)
                 axes.append(ax)
                 n += 1
@@ -95,18 +97,39 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
     if ch is None:
         ch = ah/2
 
+    # add axes in background for plotting overlays
+    if background_axes:
+        bax = fig.add_axes([dl/fw, db/fh, (nc*aw + (nc-1)*dx)/fw, (nr*ah + (nr-1)*dy)/fh],
+                           facecolor='none', zorder=0,
+                           sharex=axes[0] if sharex and nc == 1 else None,
+                           sharey=axes[0] if sharey and nr == 1 else None)
+        format_plot(bax, hide=['top', 'right', 'bottom', 'left'])
+        hide_ticks(bax)
+        bax.margins(0)
+    else:
+        bax = None
+
+    # add colorbars
     if isinstance(colorbar, Iterable):
         cax = []
         for k in colorbar:
             i = k // nc  # row
             j = k - i*nc  # col
             cax.append(fig.add_axes([(dl+(j+1)*aw+j*dx+ds)/fw, (db+(nr-i)*ah+(nr-i-1)*dy-ch-ct)/fh, cw/fw, ch/fh]))
-        return axes, cax
     elif colorbar == True:
         cax = fig.add_axes([(dl+nc*aw+(nc-1)*dx+ds)/fw, (db+nr*ah+(nr-1)*dy-ch-ct)/fh, cw/fw, ch/fh])
-        return axes, cax
     else:
-        return axes
+        cax = None
+    r = [axes]
+    if cax is not None:
+        r.append(cax)
+    if bax is not None:
+        r.append(bax)
+    if len(r) == 1:
+        r = r[0]
+    else:
+        r = tuple(r)
+    return r
 
 
 def hide_ticks(ax, axis='both'):
