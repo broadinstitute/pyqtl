@@ -100,7 +100,7 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
     # add axes in background for plotting overlays
     if background_axes:
         bax = fig.add_axes([dl/fw, db/fh, (nc*aw + (nc-1)*dx)/fw, (nr*ah + (nr-1)*dy)/fh],
-                           facecolor='none', zorder=0,
+                           facecolor='none', zorder=-1,
                            sharex=axes[0] if sharex and nc == 1 else None,
                            sharey=axes[0] if sharey and nr == 1 else None)
         format_plot(bax, hide=['top', 'right', 'bottom', 'left'])
