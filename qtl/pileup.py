@@ -17,6 +17,7 @@ import pyBigWig
 from . import stats, annotation
 from . import plot as qtl_plot
 from . import genotype as gt
+from . import core
 
 
 @contextlib.contextmanager
@@ -137,6 +138,8 @@ def regtools_extract_junctions(region_str, bam_s, bam_index_dir=None, strand=0, 
       bam_s: pd.Series or dict mapping sample_id->bam_path
       bam_index_dir: directory containing local copies of the BAM/CRAM indexes
     """
+    core.check_dependency('regtools')
+
     junctions_df = []
     n = len(bam_s)
     with mp.Pool(processes=num_threads) as pool:
@@ -188,7 +191,7 @@ def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=No
 
 
 def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive', junctions_df=None,
-         title=None, plot_variants=None, annot_track=None, max_intron=300, alpha=1, lw=0.5, junction_lw=2,
+         title=None, plot_variants=None, annot_track=None, max_intron=300, alpha=1, lw=0.5, junction_alpha=0.5, junction_lw=2,
          highlight_introns=None, highlight_introns2=None, shade_range=None, colors=None, junction_colors=None,
          ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
          pc_color='k', nc_color='darkgray', show_cds=True,
@@ -281,7 +284,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     for k,ax in enumerate(axv):
         ax.margins(0)
         ax.set_ylabel(labels[k], fontsize=12)
-        qtl_plot.format_plot(ax, fontsize=10, lw=0.6)
+        qtl_plot.format_plot(ax, fontsize=10)
         ax.tick_params(axis='x', length=3, width=0.6, pad=1)
         ax.set_xticks(gene.map_pos(gene.get_collapsed_coords().reshape(1,-1)[0]))
         ax.set_xticklabels([])
@@ -291,14 +294,19 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         ax.set_xlim(xlim)
     if ymax is not None:
         ax.set_ylim([0, ymax])
-
     if gtlabels is not None:
         gtlabels = gtlabels[sorder]
-    leg = axv[-1].legend(loc='upper left', handlelength=1, handletextpad=0.5, bbox_to_anchor=(1.02,1),
-                         labelspacing=0.2, borderaxespad=0, labels=gtlabels)
+    handles, _ = axv[-1].get_legend_handles_labels()
+    # leg = axv[-1].legend(handles[::-1], gtlabels[::-1], loc='upper left', handlelength=0.75, handletextpad=0.5, bbox_to_anchor=(1.02,1),
+    #                      labelspacing=0.2, borderaxespad=0, fontsize=10)
+    leg = axv[-1].legend(handles[::-1], gtlabels[::-1], loc='lower left', handlelength=0.75, handletextpad=0.5,
+                         labelspacing=0.2, borderaxespad=None, fontsize=10)#, framealpha=1)#, facecolor=(1, 0, 1, 0))
+
     for line in leg.get_lines():
-        line.set_linewidth(1)
-    # axv[-1].add_artist(leg)#, clip_on=False)
+        line.set_linewidth(1.5)
+
+    if plot_variants is not None and len(plot_variants) > 1:
+        axv[-1].add_artist(leg)#, clip_on=False)
 
     if variant_id is not None and title is None:
         axv[-1].set_title(f"{gene.name} :: {variant_id.split('_b')[0].replace('_',':',1).replace('_','-')}", fontsize=11)
@@ -334,8 +342,9 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         kwargs = {'ec':'k', 'lw':0.5, 's':20, 'marker':'^'}
         h1 = ax.scatter(np.nan, np.nan, fc='tab:red', **kwargs, label='Lead')
         h2 = ax.scatter(np.nan, np.nan, fc='tab:orange', **kwargs, label='Other')
-        ax.legend(handles=[h1,h2], loc='lower left', title='CS variants',
-                  handlelength=1, handletextpad=0.5, borderaxespad=0, bbox_to_anchor=(1.02, 0))
+        if len(plot_variants) > 1:
+            ax.legend(handles=[h1,h2], loc='lower left', title='CS variants',
+                      handlelength=1, handletextpad=0.5, borderaxespad=0, bbox_to_anchor=(1.02, 0))
 
     ax.set_ylim([0, ax.get_ylim()[1]])
 
@@ -401,6 +410,6 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
             else:
                 ec = cycler_colors[k]
             gene.plot_junctions(ax, junctions_df, s, show_counts=False, align='minimum', count_col=i,
-                                h=0.3, lw=junction_lw, lw_fct=np.sqrt, ec=ec, clip_on=True)
+                                h=0.3, lw=junction_lw, lw_fct=np.sqrt, ec=ec, alpha=junction_alpha, clip_on=True)
 
     return axv

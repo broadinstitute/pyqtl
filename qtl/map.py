@@ -28,9 +28,9 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
     else:
         raise ValueError('Input type not supported')
 
-    assert np.all(genotype_df.columns==phenotype_s.index)
+    # assert np.all(genotype_df.columns==phenotype_s.index)
     if covariates_df is not None:
-        assert np.all(covariates_df.index==genotype_df.columns)
+        assert covariates_df.index.equals(genotype_df.columns)
 
     # impute missing genotypes
     if impute:
@@ -47,15 +47,24 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
         p_res_s = phenotype_s
         num_covar = 0
 
-    n = p_res_s.std()/gt_res_df.std(axis=1)
+    if isinstance(p_res_s, pd.Series):
+        n = p_res_s.std() / gt_res_df.std(axis=1)
+    else:
+        n = p_res_s.std(axis=1) / gt_res_df.std(axis=1).values
 
     gt_res_df = stats.center_normalize(gt_res_df, axis=1)
-    p_res_s = stats.center_normalize(p_res_s)
+    if isinstance(p_res_s, pd.Series):
+        p_res_s = stats.center_normalize(p_res_s)
+    else:
+        p_res_s = stats.center_normalize(p_res_s, axis=1)
 
-    r = gt_res_df.dot(p_res_s)
+    if isinstance(p_res_s, pd.Series):
+        r = gt_res_df.dot(p_res_s)
+    else:  # single genotype x phenotypes
+        r = gt_res_df.dot(p_res_s.T).squeeze()
     dof = gt_res_df.shape[1] - 2 - num_covar
-
     tstat = r * np.sqrt(dof/(1-r*r))
+
     if not logp:
         pval = 2*scipy.stats.t.cdf(-np.abs(tstat), dof)
     else:
@@ -68,10 +77,14 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
     df['slope_se'] = df['slope'] / tstat
     df['corr_r2'] = r*r
     df['tstat'] = tstat
-    n2 = 2*genotype_df.shape[1]
+    n2 = 2 * genotype_df.shape[1]
     af = genotype_df.sum(1) / n2
-    ix = af <= 0.5
-    df['maf'] = np.where(ix, af, 1-af)
+    if isinstance(p_res_s, pd.Series):
+        df['af'] = af
+    else:
+        assert len(af) == 1
+        df['af'] = af.values[0]
+    ix = df['af'] <= 0.5
     m = genotype_df > 0.5
     a = m.sum(1).astype(int)
     b = (genotype_df < 1.5).sum(1).astype(int)
@@ -84,10 +97,13 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
         else:
             df['r2'] = locusplot.compute_ld(genotype, df['pval_nominal'].idxmin())
 
-    if isinstance(df.index[0], str) and '_' in df.index[0]:
+    if isinstance(df.index[0], str) and '_' in df.index[0]:  # assume variant IDs in format chr_pos_ref_alt_build
         df['chr'] = df.index.map(lambda x: x.split('_')[0])
         df['position'] = df.index.map(lambda x: int(x.split('_')[1]))
-    df.index.name = 'variant_id'
+    if isinstance(p_res_s, pd.Series):
+        df.index.name = 'variant_id'
+    else:
+        df.index.name = 'phenotype_id'
     m = df['pval_nominal'] == 0
     if any(m):
         e = np.nextafter(0, 1)  # np.finfo(np.float64).tiny

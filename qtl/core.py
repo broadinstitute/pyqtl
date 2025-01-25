@@ -4,9 +4,9 @@ import os
 
 def check_dependency(name):
     """"""
-    e = subprocess.call('which '+name, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    if e!=0:
-        raise RuntimeError('External dependency \''+name+'\' not installed')
+    e = subprocess.call(f"which {name}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if e != 0:
+        raise RuntimeError(f"External dependency '{name}' not installed")
 
 
 def refresh_gcs_token():

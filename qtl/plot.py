@@ -206,14 +206,15 @@ def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
 
 
 def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=None, covariates_df=None,
-            legend_text=None, show_pval=False, normalized=False, loc=None, ax=None, color=[0.5]*3,
-            variant_id=None, jitter=0, bvec=None, boxplot=False, xlabel=None, dr=0.25, dt=0.25, db=0.5, dl=0.75,
+            legend_text=None, show_pval=False, show_slope=False, normalized=False, loc=None, ax=None, color=[0.5]*3,
+            variant_id=None, jitter=0, bvec=None, boxplot=False, xlabel=None, clip_on=True,
+            aw=2, ah=2, dr=0.25, dt=0.25, db=0.5, dl=0.75, width=0.75, lw=1,
             ylabel='Normalized expression', title=None, show_counts=True):
     """"""
 
     assert p.index.equals(g.index)
 
-    if show_pval:
+    if show_pval or show_slope:
         stats_s = qtl_map.calculate_association(g, p, covariates_df=covariates_df).iloc[0]
 
     if covariates_df is not None:
@@ -226,9 +227,7 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
         qtl_df = pd.concat([qtl_df, label_s], axis=1, sort=False)
 
     if ax is None:
-        ax = setup_figure(2, 2, xspace=[dl, dr], yspace=[db, dt])
-    ax.spines['bottom'].set_position(('outward', 4))
-    ax.spines['left'].set_position(('outward', 4))
+        ax = setup_figure(aw, ah, xspace=[dl, dr], yspace=[db, dt])
 
     if not normalized:
         if split and label_s is not None:
@@ -240,12 +239,12 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             pal = sns.color_palette(split_colors)
             i = qtl_df.columns[2]
             sns.violinplot(x="genotype", y="phenotype", hue=i, hue_order=sorted(qtl_df[i].unique()),
-                           data=qtl_df, palette=pal, ax=ax, order=[0,1,2], density_norm='width', cut=0, linewidth=1, width=0.75)
+                           data=qtl_df, palette=pal, ax=ax, order=[0,1,2], density_norm='width', cut=0, linewidth=lw, width=width)
             l = ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1), fontsize=8, handlelength=0.6, ncol=2, handletextpad=0.5, labelspacing=0.33)
             l.set_title(None)
         else:
-            sns.violinplot(x="genotype", y="phenotype", data=qtl_df,
-                           cut=0, ax=ax, order=[0,1,2], color=color)
+            sns.violinplot(x="genotype", y="phenotype", data=qtl_df, width=width,
+                           cut=0, ax=ax, order=[0,1,2], color=color, linewidth=lw, clip_on=clip_on)
     else:
         pass
         # if labels is not None:
@@ -260,6 +259,11 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
     ax.set_xlim([-0.5,2.5])
     ax.spines['bottom'].set_bounds([0, 2])
     ax.yaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=5, nbins=5))
+
+    if show_slope:
+        x = np.array([-0.5, 2.5])
+        r = scipy.stats.linregress(g, p)
+        ax.plot(x, r.intercept + x*r.slope, linestyle=(0, (3, 2)), lw=2, color='tab:blue')
 
     if title is not None:
         ax.set_title(title, fontsize=12)
@@ -292,7 +296,7 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
         if stats_s['slope'] > 0:
             ax.text(0.05, 1, f"P = {stats_s['pval_nominal']:.2g}", va='top', ha='left', transform=ax.transAxes, fontsize=11)
         else:
-            ax.text(0.05, 1, f"P = {stats_s['pval_nominal']:.2g}", va='top', ha='right', transform=ax.transAxes, fontsize=11)
+            ax.text(0.95, 1, f"P = {stats_s['pval_nominal']:.2g}", va='top', ha='right', transform=ax.transAxes, fontsize=11)
 
     return ax
 

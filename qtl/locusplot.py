@@ -384,13 +384,14 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
                 ax.scatter(pip_df2['position'], pip_df2['pip'], c=pip_df2['cs_id'].map(pd.Series(range(len(cs_id)), index=cs_id)).values,
                            cmap=cs_cmap, norm=cs_norm, s=24, marker='D', ec='k', lw=0.25)
 
-                for i,r in pip_df2.iterrows():
-                    i = i.split('_b')[0].replace('_',':',1).replace('_','-')
-                    if (r['position']-xlim[0])/(xlim[1]-xlim[0]) < 0.55:  # right
-                        txt = ax.annotate(i, (r['position'], r['pip']), xytext=(5,5), textcoords='offset points')
-                    else:
-                        txt = ax.annotate(i, (r['position'], r['pip']), xytext=(-5,5), ha='right', textcoords='offset points')
-                    txt.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
+                if k == 0 or not label_first_only:
+                    for i,r in pip_df2.iterrows():
+                        i = i.split('_b')[0].replace('_',':',1).replace('_','-')
+                        if (r['position']-xlim[0])/(xlim[1]-xlim[0]) < 0.55:  # right
+                            txt = ax.annotate(i, (r['position'], r['pip']), xytext=(5,5), textcoords='offset points')
+                        else:
+                            txt = ax.annotate(i, (r['position'], r['pip']), xytext=(-5,5), ha='right', textcoords='offset points')
+                        txt.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
 
             if rs_id is not None:
                 if isinstance(rs_id, str):
@@ -414,27 +415,35 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
             arrow_dr = 0.125
             arrow_dt = 0.2
             beta_col = [i for i in pval_df.columns if i in ('slope', 'beta', 'effect_size')]
-            assert len(beta_col) == 1, f"No effect size found"
-            beta_col = beta_col[0]
-            beta = pval_df.loc[variant_id, beta_col]
-            if beta > 0:
-                ax.arrow(1-arrow_dr/aw, 1-(arrow_height+arrow_dt)/ah, 0, arrow_height/ah,
-                         head_length=0.1/ah, width=arrow_width/aw,
-                         ec='none', fc='tab:green', transform=ax.transAxes)
-                ax.text(1-arrow_dr*1.66/aw, 1-(arrow_height/2+arrow_dt)/ah, r"$\beta$", va='center', ha='center', transform=ax.transAxes)
-            else:
-                ax.arrow(1-arrow_dr/aw, 1-(arrow_dt-0.1)/ah, 0, -arrow_height/ah,
-                         head_length=0.1/ah, width=arrow_width/aw,
-                         ec='none', fc='tab:red', transform=ax.transAxes)
-                ax.text(1-arrow_dr*1.66/aw, 1-(arrow_dt-0.1+arrow_height/2)/ah, r"$\beta$", va='center', ha='center', transform=ax.transAxes)
+            # assert len(beta_col) == 1, f"No effect size found"
+            if len(beta_col) == 1:
+                beta_col = beta_col[0]
+                beta = pval_df.loc[variant_id, beta_col]
+                if beta > 0:
+                    ax.arrow(1-arrow_dr/aw, 1-(arrow_height+arrow_dt)/ah, 0, arrow_height/ah,
+                             head_length=0.1/ah, width=arrow_width/aw,
+                             ec='none', fc='tab:green', transform=ax.transAxes)
+                    ax.text(1-arrow_dr*1.66/aw, 1-(arrow_height/2+arrow_dt)/ah, r"$\beta$", va='center', ha='center', transform=ax.transAxes)
+                else:
+                    ax.arrow(1-arrow_dr/aw, 1-(arrow_dt-0.1)/ah, 0, -arrow_height/ah,
+                             head_length=0.1/ah, width=arrow_width/aw,
+                             ec='none', fc='tab:red', transform=ax.transAxes)
+                    ax.text(1-arrow_dr*1.66/aw, 1-(arrow_dt-0.1+arrow_height/2)/ah, r"$\beta$", va='center', ha='center', transform=ax.transAxes)
 
         ax.margins(y=0.2)
-        if 'pip' in pval_df:
-            ax.set_ylim([0, ax.get_ylim()[1]])
-        elif ymax is None:
-            ax.set_ylim([0, np.maximum(ax.get_ylim()[1], miny)])
+        if ymax is not None and isinstance(ymax, Iterable):
+            if ymax[k] is not None:
+                ax.set_ylim([0, ymax[k]])
+            else:
+                ax.set_ylim([0, ax.get_ylim()[1]])
         else:
-            ax.set_ylim([0, ymax[k]])
+            if 'pip' in pval_df:
+                ax.set_ylim([0, ax.get_ylim()[1]])
+            elif ymax is None:
+                ax.set_ylim([0, np.maximum(ax.get_ylim()[1], miny)])
+            else:
+                ax.set_ylim([0, ymax])
+
         if shade_range is not None:  # highlight subregion with gray background
             ax.add_patch(patches.Rectangle((shade_range[0], 0), np.diff(shade_range)[0], ax.get_ylim()[1], facecolor=shade_color, zorder=-10))
 
@@ -573,7 +582,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
         gax.set_xlim(xlim)
         axes.append(gax)
 
-    if chr_label_pos!='bottom':
+    if chr_label_pos != 'bottom':
         axes[0].xaxis.tick_top()
         axes[0].xaxis.set_label_position('top')
         axes[0].set_xlabel(f'Position on {chrom} (Mb)', fontsize=12)
@@ -583,6 +592,9 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
 
     for ax in axes:
         ax.set_facecolor('none')
+
+    # for i in range(len(pvals)):
+    #     axes[i].get_yaxis().set_label_coords(-0.12,0.5)
 
     return axes
 
