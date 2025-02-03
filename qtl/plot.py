@@ -71,7 +71,13 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
     if ntot is None:
         ntot = nr * nc
 
-    fw = dl + nc*aw + (nc-1)*dx + dr
+    if not isinstance(aw, Iterable):
+        aw = nc * [aw]
+
+    if not isinstance(polar, Iterable):
+        polar = ntot * [polar]
+
+    fw = dl + sum(aw) + (nc-1)*dx + dr
     fh = db + nr*ah + (nr-1)*dy + dt
     fig = plt.figure(figsize=(fw,fh), facecolor='none')
     axes = []
@@ -85,10 +91,10 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
     for j in range(nr):
         for i in range(si(j), nc):
             if n < ntot:
-                ax = fig.add_axes([(dl+i*(aw+dx))/fw, (db+(nr-j-1)*(ah+dy))/fh, aw/fw, ah/fh], facecolor='none', polar=polar,
+                ax = fig.add_axes([(dl+sum(aw[:i])+i*dx)/fw, (db+(nr-j-1)*(ah+dy))/fh, aw[i]/fw, ah/fh], facecolor='none', zorder=0, polar=polar[n],
                                   sharex=axes[0] if sharex and n>0 else None,
                                   sharey=axes[0] if sharey and n>0 else None)
-                if not polar:
+                if not polar[n]:
                     format_plot(ax, fontsize=fontsize, hide=hide, x_offset=x_offset, y_offset=y_offset)
                 ax.margins(margins)
                 axes.append(ax)
@@ -99,8 +105,8 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
 
     # add axes in background for plotting overlays
     if background_axes:
-        bax = fig.add_axes([dl/fw, db/fh, (nc*aw + (nc-1)*dx)/fw, (nr*ah + (nr-1)*dy)/fh],
-                           facecolor='none', zorder=-1,
+        bax = fig.add_axes([dl/fw, db/fh, (sum(aw) + (nc-1)*dx)/fw, (nr*ah + (nr-1)*dy)/fh],
+                           facecolor='none', zorder=-1, label='background',
                            sharex=axes[0] if sharex and nc == 1 else None,
                            sharey=axes[0] if sharey and nr == 1 else None)
         format_plot(bax, hide=['top', 'right', 'bottom', 'left'])
@@ -115,9 +121,9 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
         for k in colorbar:
             i = k // nc  # row
             j = k - i*nc  # col
-            cax.append(fig.add_axes([(dl+(j+1)*aw+j*dx+ds)/fw, (db+(nr-i)*ah+(nr-i-1)*dy-ch-ct)/fh, cw/fw, ch/fh]))
+            cax.append(fig.add_axes([(dl+sum(aw[:j+1])+j*dx+ds)/fw, (db+(nr-i)*ah+(nr-i-1)*dy-ch-ct)/fh, cw/fw, ch/fh]))
     elif colorbar == True:
-        cax = fig.add_axes([(dl+nc*aw+(nc-1)*dx+ds)/fw, (db+nr*ah+(nr-1)*dy-ch-ct)/fh, cw/fw, ch/fh])
+        cax = fig.add_axes([(dl+sum(aw)+(nc-1)*dx+ds)/fw, (db+nr*ah+(nr-1)*dy-ch-ct)/fh, cw/fw, ch/fh])
     else:
         cax = None
     r = [axes]
