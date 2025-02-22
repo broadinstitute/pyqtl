@@ -254,6 +254,7 @@ class Transcript(object):
 
         return s
 
+
 class Gene(object):
     def __init__(self, gene_id, gene_name, gene_type, chrom, strand, start_pos, end_pos, transcript_list=None):
         self.id = gene_id
@@ -670,7 +671,7 @@ class Gene(object):
         return ax
 
     def get_mane_transcript(self, tag='MANE_Select'):
-        mane_transcript = [t for t in self.transcripts if 'tags' in t.attributes and tag in t.attributes['tags']]
+        mane_transcript = [t for t in self.transcripts if hasattr(t, 'attributes') and 'tags' in t.attributes and tag in t.attributes['tags']]
         assert len(mane_transcript) <= 1
         if len(mane_transcript) == 1:
             return mane_transcript[0]
