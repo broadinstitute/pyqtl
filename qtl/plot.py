@@ -906,7 +906,7 @@ def clustermap(df, Zx=None, Zy=None, cluster=True, aw=3, ah=3, lw=1, vmin=None, 
 
     fw = dl + aw + dr + nr*(lh+ls)
     fh = db + ah + ds + dd + dt + nc*(lh+ls)
-    fig = plt.figure(figsize=(fw,fh))
+    fig = plt.figure(figsize=(fw,fh), facecolor='none')
     dl2 = dl + nr*(lh+ls)
     if dendrogram_pos == 'top':
         ax = fig.add_axes([dl2/fw, db/fh, aw/fw, ah/fh])

@@ -7,6 +7,7 @@ __license__ = "BSD3"
 import numpy as np
 import pandas as pd
 import scipy.stats
+import re
 from . import stats
 from . import genotype as gt
 from . import locusplot
@@ -97,7 +98,8 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
         else:
             df['r2'] = locusplot.compute_ld(genotype, df['pval_nominal'].idxmin())
 
-    if isinstance(df.index[0], str) and '_' in df.index[0]:  # assume variant IDs in format chr_pos_ref_alt_build
+    # if isinstance(df.index[0], str) and '_' in df.index[0]:  # assume variant IDs in format chr_pos_ref_alt_build
+    if isinstance(df.index[0], str) and len(re.findall("(?:chr)?\d+_\d+_", df.index[0])) == 1:
         df['chr'] = df.index.map(lambda x: x.split('_')[0])
         df['position'] = df.index.map(lambda x: int(x.split('_')[1]))
     if isinstance(p_res_s, pd.Series):
@@ -152,7 +154,7 @@ def map_pairs(genotype_df, phenotype_df, covariates_df=None, impute=True):
 
 def calculate_interaction(genotype_s, phenotype_s, interaction_s, covariates_df=None, impute=True):
 
-    assert np.all(genotype_s.index==interaction_s.index)
+    assert genotype_s.index.equals(interaction_s.index)
 
     # impute missing genotypes
     if impute:

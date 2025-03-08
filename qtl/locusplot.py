@@ -208,7 +208,7 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
                tracks=None, track_colors=None, shared_only=True, show_effect=False,
                xlim=None, ymax=None, miny=5, sharey=None, labels=None, label_fontsize=12, title=None, shade_range=None, shade_color='#cecece',
                label_pos='left', gene_label_pos=None, chr_label_pos='bottom', window=200000, colorbar=True, gene_scale=0.33,
-               dl=0.75, aw=4, dr=0.75, db=0.5, ah=1.25, dt=0.25, ds=0.1, gh=0.2, th=1.5,
+               dl=0.75, aw=4, dr=0.75, db=0.5, ah=1.25, dt=0.25, ds=0.1, gh=0.2, th=1.5, ytext=5,
                single_ylabel=False, ylabel='-log$\mathregular{_{10}}$(p-value)', rasterized=False):
     """
       pvals: pd.DataFrame, or list of pd.DataFrame. Must contain 'pval_nominal' and 'position' columns.
@@ -403,10 +403,9 @@ def plot_locus(pvals, variant_ids=None, gene=None, r2_s=None, rs_id=None,
 
             if show_rsid and minpos is not None and 'pip' not in pval_df and (k == 0 or not label_first_only):  # text label
                 if (minpos-xlim[0])/(xlim[1]-xlim[0]) < 0.55:  # right
-                    txt = ax.annotate(t, (minpos, minp), xytext=(5,5), textcoords='offset points')
+                    txt = ax.annotate(t, (minpos, minp), xytext=(5,ytext), textcoords='offset points')
                 else:
-                    txt = ax.annotate(t, (minpos, minp), xytext=(-5,5), ha='right', textcoords='offset points')
-            # if minp < -np.log10(pval_df['pval_nominal'].min())*0.8:
+                    txt = ax.annotate(t, (minpos, minp), xytext=(-5,ytext), ha='right', textcoords='offset points')
                 txt.set_bbox(dict(facecolor='w', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.1"))
 
         if show_effect:

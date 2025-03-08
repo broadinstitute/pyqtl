@@ -265,12 +265,7 @@ class Gene(object):
         self.havana_id = '-'
         self.start_pos = start_pos
         self.end_pos = end_pos
-        if strand == '+':
-            self.tss = start_pos
-            self.tes = end_pos
-        else:
-            self.tss = end_pos
-            self.tes = start_pos
+        self.set_tss()
         self.transcripts = []
         self.exclude_biotypes = []
         self.mappability = None
@@ -292,6 +287,14 @@ class Gene(object):
         return (self.id == other.id and
                 len(self.transcripts) == len(other.transcripts) and
                 np.all([i == j for i,j in zip(self.transcripts, other.transcripts)]))
+
+    def set_tss(self):
+        if self.strand == '+':
+            self.tss = self.start_pos
+            self.tes = self.end_pos
+        else:
+            self.tss = self.end_pos
+            self.tes = self.start_pos
 
     def get_coverage(self, bigwig):
         """Returns coverage for the genomic region spanned by the gene"""
@@ -324,6 +327,7 @@ class Gene(object):
         self.transcripts = transcripts
         self.start_pos = np.min([t.start_pos for t in transcripts])
         self.end_pos = np.max([t.end_pos for t in transcripts])
+        self.set_tss()
 
     def set_plot_coords(self, max_intron=1000, reference=None):
         """"""
