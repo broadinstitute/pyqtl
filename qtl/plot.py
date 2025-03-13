@@ -12,6 +12,7 @@ import scipy.cluster.hierarchy as hierarchy
 from cycler import cycler
 from collections.abc import Iterable
 import copy
+import itertools
 
 from . import stats
 from . import map as qtl_map
@@ -393,7 +394,7 @@ def plot_interaction(p, g, i, variant_id=None, annot=None, covariates_df=None, l
     return ax
 
 
-def plot_ld(ld_df, ld_threshold=0.1, s=0.25, alpha=1, yscale=3, xunit=1e6,
+def plot_ld(ld_df, ld_threshold=0.1, s=0.25, alpha=1, yscale=3, xunit=1e6, ld_bounds=None,
             cmap=plt.cm.Greys, start_pos=None, end_pos=None, ax=None, cax=None,
             clip_on=False, rasterized=True):
     """"""
@@ -462,13 +463,21 @@ def plot_ld(ld_df, ld_threshold=0.1, s=0.25, alpha=1, yscale=3, xunit=1e6,
     ax.set_yticks([])
 
     ax.set_xlabel(f"Position on {variant_df['chr'].iloc[0]} (Mb)", fontsize=14)
+
+    if ld_bounds is not None:
+        ci = (ld_bounds[:-1] + ld_bounds[1:]) / 2  # center position for each block
+        y = -np.diff(ld_bounds) / 2 / xunit
+        yi = np.array([i for i in itertools.chain(*itertools.zip_longest(np.zeros(len(ld_bounds)), y)) if i is not None])
+        xi = np.array([i for i in itertools.chain(*itertools.zip_longest(ld_bounds, ci)) if i is not None])
+        ax.plot(xi/xunit, yi, linestyle=(0, (4, 3)), lw=1, color='tab:red')
+
     return ax
 
 
-def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=None,
+def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, ld_bounds=None, coverage_cat=None,
                        track_colors=None, labels=None, order=None,
                        pip_df=None, pip_order=None, pip_colors=None, pip_legend=False,
-                       gene=None, ld_marker_size=1, aw=6, ah=4, dl=1.5, dr=1.5, ph=0.1, gh=0.15):
+                       gene=None, ld_marker_size=1, aw=6, ah=4, dl=2, dr=1, ph=0.1, gh=0.15):
     """
     Visualization of genetic locus, combining coverage tracks (e.g., ATAC-seq),
     variants (e.g., fine-mapped QTLs), genes/transcripts, and LD.
@@ -525,6 +534,7 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=No
         axes.append(gax)
     if ld_df is not None:
         lax = fig.add_axes([dl/fw, db/fh, aw/fw, ldh/fh], facecolor='none', sharex=axes[0] if len(axes)>0 else None)
+        lcax = fig.add_axes([(dl+aw+ds)/fw, (db+ldh/2)/fh, 0.1/fw, ldh/2/fh], facecolor='none')
         axes.append(lax)
 
     chrom, start_pos, end_pos = re.split(':|-', region_str)
@@ -646,7 +656,8 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, coverage_cat=No
 
     if ld_df is not None:
         format_plot(lax, fontsize=10)
-        plot_ld(ld_df, start_pos=start_pos, end_pos=end_pos, cmap=plt.cm.Greys, s=ld_marker_size, clip_on=True, yscale=aw/ldh, ax=lax)
+        plot_ld(ld_df, ld_bounds=ld_bounds, start_pos=start_pos, end_pos=end_pos, cmap=plt.cm.Greys,
+                s=ld_marker_size, clip_on=True, yscale=aw/ldh, ax=lax, cax=lcax)
 
     if len(axes) > 0:
         axes[-1].set_xlabel(f"Position on {chrom} (Mb)", fontsize=12)
