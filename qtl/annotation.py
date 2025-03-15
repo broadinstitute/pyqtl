@@ -192,6 +192,13 @@ class Transcript(object):
         else:
             return np.concatenate([np.arange(r[1], r[0]-1, -1) for r in cds_ranges])
 
+    def get_coords(self):
+        """Get genomic coordinates, in direction of transcription (matches get_sequence)"""
+        if self.gene.strand == '+':
+            return np.array([j for i in [np.arange(e.start_pos, e.end_pos+1) for e in self.exons] for j in i])
+        else:
+            return np.array([j for i in [np.arange(e.start_pos, e.end_pos+1) for e in self.exons[::-1]] for j in i])[::-1]
+
     def get_sequence(self, feature='all', fasta_dict=None, fasta=None, include_stop=False):
         """Load transcript sequence from FASTA file"""
         if fasta is not None:
