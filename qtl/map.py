@@ -99,7 +99,7 @@ def calculate_association(genotype, phenotype_s, covariates_df=None, impute=True
             df['r2'] = locusplot.compute_ld(genotype, df['pval_nominal'].idxmin())
 
     # if isinstance(df.index[0], str) and '_' in df.index[0]:  # assume variant IDs in format chr_pos_ref_alt_build
-    if isinstance(df.index[0], str) and len(re.findall("(?:chr)?\d+_\d+_", df.index[0])) == 1:
+    if isinstance(df.index[0], str) and len(re.findall("^(?:chr)?\w_?\d+_", df.index[0])) == 1:
         df['chr'] = df.index.map(lambda x: x.split('_')[0])
         df['position'] = df.index.map(lambda x: int(x.split('_')[1]))
     if isinstance(p_res_s, pd.Series):
@@ -199,7 +199,7 @@ def calculate_interaction(genotype_s, phenotype_s, interaction_s, covariates_df=
         'b_g':b[0], 'b_g_se':b_se[0], 'pval_g':pval[0],
         'b_i':b[1], 'b_i_se':b_se[1], 'pval_i':pval[1],
         'b_gi':b[2],'b_gi_se':b_se[2],'pval_gi':pval[2],
-    }), r[0]
+    })#, r[0]
 
 
 def compute_ld(genotype_df, variant_id):
