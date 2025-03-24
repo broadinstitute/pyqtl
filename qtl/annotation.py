@@ -12,6 +12,7 @@ import gzip
 import scipy.interpolate as interpolate
 from collections import defaultdict
 import pyBigWig
+from Bio.Seq import Seq
 from bx.intervals.intersection import IntervalTree
 
 
@@ -97,10 +98,6 @@ def get_coord_transform(gene, max_intron=1000):
     icoords = np.array([[d+0, d+e-1] for e,d in zip(exon_lengths, np.cumsum(np.r_[0, exon_lengths[:-1]+transformed_intron_lengths]))]).reshape(1,-1)[0]
     ifct = interpolate.interp1d(coords, icoords, kind='linear')
     return ifct
-
-
-def reverse_complement(s):
-    return s.translate(str.maketrans('ATCG', 'TAGC'))[::-1]
 
 
 def _str_to_pos(region_str):
@@ -257,7 +254,7 @@ class Transcript(object):
             raise ValueError('Reference genome FASTA must either be loaded with annotation.load_fasta() or provided as input.')
 
         if self.gene.strand == '-':
-            s = reverse_complement(s)
+            s = str(Seq(s).reverse_complement())
 
         return s
 
