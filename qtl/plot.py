@@ -212,6 +212,24 @@ def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
     # ax.autoscale(True)  # temporary fix?
 
 
+def plot_vlines(ax, pos, color, linestyle='-', alpha=1, lw=1, ylim=None, ymax=None, zorder=None):
+    """Plot vertical lines spanning ylim"""
+    if ylim is None:
+        if ymax is not None:
+            ylim = [0, ymax]
+        else:
+            ylim = ax.get_ylim()
+
+    kwargs = {'c':color, 'lw':lw, 'alpha':alpha, 'zorder':0, 'linestyle':linestyle, 'zorder':zorder}
+    npos = len(pos)
+    if npos > 1:
+        x = np.tile(np.array(pos), [2, 1])
+        y = np.tile(ylim, [npos, 1]).T
+        ax.plot(x, y, **kwargs)
+    else:
+        ax.plot([pos[0]]*2, ylim, **kwargs)
+
+
 def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=None, covariates_df=None,
             legend_text=None, show_pval=False, show_slope=False, normalized=False, loc=None, ax=None, color=[0.5]*3,
             variant_id=None, jitter=0, bvec=None, boxplot=False, xlabel=None, clip_on=True,
@@ -250,7 +268,7 @@ def plot_qtl(g, p, label_s=None, label_colors=None, split=False, split_colors=No
             l = ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1), fontsize=8, handlelength=0.6, ncol=2, handletextpad=0.5, labelspacing=0.33)
             l.set_title(None)
         else:
-            sns.violinplot(x="genotype", y="phenotype", data=qtl_df, width=width,
+            sns.violinplot(x="genotype", y="phenotype", data=qtl_df, width=width, density_norm='width',
                            cut=0, ax=ax, order=[0,1,2], color=color, linewidth=lw, clip_on=clip_on)
     else:
         pass
@@ -371,7 +389,7 @@ def plot_interaction(p, g, i, variant_id=None, annot=None, covariates_df=None, l
         ax.plot(xlim, y(xlim), '-', lw=1.5)
 
     leg = ax.legend(fontsize=12, labelspacing=0.25, handletextpad=0, borderaxespad=0, handlelength=1.5)
-    for lh in leg.legendHandles:
+    for lh in leg.legend_handles:
         lh.set_alpha(1)
 
     ax.xaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=3, integer=True, nbins=4))

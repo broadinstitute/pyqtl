@@ -14,6 +14,7 @@ from collections import defaultdict
 import pyBigWig
 from Bio.Seq import Seq
 from bx.intervals.intersection import IntervalTree
+from . import plot
 
 
 def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'], lw=1, fontsize=9):
@@ -384,7 +385,9 @@ class Gene(object):
 
         return y
 
-    def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, show_cds=True, highlight_region=None,
+    def plot(self, coverage=None, max_intron=1000, scale=0.4, ax=None, show_cds=True,
+             highlight_region=None, highlight_region_color='tab:red',
+             highlight_pos=None, highlight_pos_color='tab:orange',
              pc_color=[0.6, 0.88, 1], nc_color='#aaaaaa', ec=[0, 0.7, 1], wx=0.05, reference=None, ylabels='id',
              highlight_exons=None, highlight_introns=None, highlight_introns2=None,
              highlight_color='tab:red', clip_on=False, yoffset=0, xlim=None,
@@ -526,7 +529,7 @@ class Gene(object):
                         if ic in introns:
                             s = self.map_pos(ic[0]-1)+1
                             e = self.map_pos(ic[1]+1)-1
-                            patch = patches.Rectangle((s, y), e-s, wx, fc='lightskyblue', zorder=1, clip_on=clip_on)
+                            patch = patches.Rectangle((s, y), e-s, wx, fc=highlight_color, zorder=1, clip_on=clip_on)
                             ax.add_patch(patch)
 
                 if highlight_introns2 is not None:
@@ -628,8 +631,13 @@ class Gene(object):
             s,e = highlight_region.split(':')[-1].split('-')
             s = self.map_pos(int(s))
             e = self.map_pos(int(e))
-            patch = patches.Rectangle((s, -0.5), e-s, len(transcripts), fc=hsv_to_rgb([0, 0.8, 1]), alpha=0.5, zorder=-10, clip_on=clip_on)
+            patch = patches.Rectangle((s, -0.5), e-s, len(transcripts), fc=highlight_region_color, alpha=0.5, zorder=-2, clip_on=clip_on)
             ax.add_patch(patch)
+
+        ax.set_ylim([-0.5, i+0.5])
+
+        if highlight_pos is not None:
+            plot.plot_vlines(ax, self.map_pos(highlight_pos), highlight_pos_color, alpha=1, lw=1, zorder=0)
 
         ax.set_ylim([-0.6, i+0.6])
 

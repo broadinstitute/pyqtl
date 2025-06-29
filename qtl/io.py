@@ -29,7 +29,7 @@ def sort_bed(bed_df, inplace=True):
 def write_bed(bed_df, output_name, header=True, float_format=None):
     """Write DataFrame to BED format"""
     if header:  
-        assert (bed_df.columns[0] == 'chr' or bed_df.columns[0] == '#chr') and bed_df.columns[1] == 'start' and bed_df.columns[2] == 'end'
+        assert (bed_df.columns[0].lower() in ('chr', '#chr')) and bed_df.columns[1].lower() == 'start' and bed_df.columns[2].lower() == 'end'
         # header must be commented in BED format
         header = bed_df.columns.values.copy()
         header[0] = '#chr'

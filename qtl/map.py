@@ -230,10 +230,10 @@ def get_conditional_pvalues(group_df, genotypes, phenotype_df, covariates_df,
     else:
         raise ValueError('Unsupported input format')
 
-    maf = gt_df.sum(1) / (2*gt_df.shape[1])
-    maf = np.where(maf<=0.5, maf, 1-maf)
-
-    gt_df = gt_df[maf >= maf_threshold]
+    if maf_threshold > 0:
+        maf = gt_df.sum(1) / (2*gt_df.shape[1])
+        maf = np.where(maf<=0.5, maf, 1-maf)
+        gt_df = gt_df[maf >= maf_threshold].copy()
 
     res = []
     if phenotype_id is not None:
