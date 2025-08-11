@@ -75,11 +75,14 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
     if not isinstance(aw, Iterable):
         aw = nc * [aw]
 
+    if not isinstance(ah, Iterable):
+        ah = nr * [ah]
+
     if not isinstance(polar, Iterable):
         polar = ntot * [polar]
 
     fw = dl + sum(aw) + (nc-1)*dx + dr
-    fh = db + nr*ah + (nr-1)*dy + dt
+    fh = db + sum(ah) + (nr-1)*dy + dt
     fig = plt.figure(figsize=(fw,fh), facecolor='none')
     axes = []
     n = 0
@@ -92,7 +95,7 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
     for j in range(nr):
         for i in range(si(j), nc):
             if n < ntot:
-                ax = fig.add_axes([(dl+sum(aw[:i])+i*dx)/fw, (db+(nr-j-1)*(ah+dy))/fh, aw[i]/fw, ah/fh], facecolor='none', zorder=0, polar=polar[n],
+                ax = fig.add_axes([(dl+sum(aw[:i])+i*dx)/fw, (db+sum(ah[::-1][:nr-j-1])+(nr-j-1)*dy)/fh, aw[i]/fw, ah[j]/fh], facecolor='none', zorder=0, polar=polar[n],
                                   sharex=axes[0] if sharex and n>0 else None,
                                   sharey=axes[0] if sharey and n>0 else None)
                 if not polar[n]:
@@ -100,9 +103,6 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
                 ax.margins(margins)
                 axes.append(ax)
                 n += 1
-
-    if ch is None:
-        ch = ah/2
 
     # add axes in background for plotting overlays
     if background_axes:
@@ -117,6 +117,8 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
         bax = None
 
     # add colorbars
+    if colorbar is not None and ch is None:
+        ch = ah[0]/2
     if isinstance(colorbar, Iterable):
         cax = []
         for k in colorbar:

@@ -313,18 +313,20 @@ class Gene(object):
         ecoord = [[e.start_pos, e.end_pos] for t in self.transcripts for e in t.exons if t.type not in self.exclude_biotypes]
         return interval_union(ecoord)
 
-    def collapse(self, exclude_biotypes=['readthrough_transcript', 'retained_intron']):
+    def collapse(self, use_mane=False, exclude_biotypes=['readthrough_transcript', 'retained_intron']):
         """Return collapsed version of the gene"""
         g = copy.deepcopy(self)
-        g.exclude_biotypes = exclude_biotypes
-        transcripts = [t for t in g.transcripts if t.type not in exclude_biotypes]
-        start_pos = min([t.start_pos for t in transcripts])
-        end_pos = max([t.end_pos for t in transcripts])
-        t = Transcript(g.id, g.name, g.type, g, start_pos, end_pos)
-        exon_coords = g.get_collapsed_coords()
-        if g.strand == '-':
-            exon_coords = exon_coords[::-1]
-        t.exons = [Exon(f"{g.id}_{k}", k, t, i[0], i[1]) for k,i in enumerate(exon_coords, 1)]
+        t = g.get_mane_transcript()
+        if not use_mane or t is None:
+            g.exclude_biotypes = exclude_biotypes
+            transcripts = [t for t in g.transcripts if t.type not in exclude_biotypes]
+            start_pos = min([t.start_pos for t in transcripts])
+            end_pos = max([t.end_pos for t in transcripts])
+            t = Transcript(g.id, g.name, g.type, g, start_pos, end_pos)
+            exon_coords = g.get_collapsed_coords()
+            if g.strand == '-':
+                exon_coords = exon_coords[::-1]
+            t.exons = [Exon(f"{g.id}_{k}", k, t, i[0], i[1]) for k,i in enumerate(exon_coords, 1)]
         g.set_transcripts([t])
         return g
 
