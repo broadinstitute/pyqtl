@@ -391,7 +391,7 @@ class Gene(object):
              highlight_region=None, highlight_region_color='tab:red',
              highlight_pos=None, highlight_pos_color='tab:orange',
              pc_color=[0.6, 0.88, 1], nc_color='#aaaaaa', ec=[0, 0.7, 1], wx=0.05, reference=None, ylabels='id',
-             highlight_exons=None, highlight_introns=None, highlight_introns2=None,
+             highlight_exons=None, exon_colors=None, highlight_introns=None, highlight_introns2=None,
              highlight_color='tab:red', clip_on=False, yoffset=0, xlim=None,
              highlight_transcripts=None, exclude_biotypes=[]):
         """
@@ -432,20 +432,14 @@ class Gene(object):
         if highlight_exons is not None:
             if isinstance(highlight_exons, str):
                 highlight_exons = {_str_to_pos(i) for i in highlight_exons.split(',')}
-            else:
-                highlight_exons = {_str_to_pos(i) for i in highlight_exons}
 
         if highlight_introns is not None:
             if isinstance(highlight_introns, str):
-                highlight_introns = {_str_to_pos(highlight_introns)}
-            else:
-                highlight_introns = {_str_to_pos(i) for i in highlight_introns}
+                highlight_introns = {_str_to_pos(i) for i in highlight_introns.split(',')}
 
         if highlight_introns2 is not None:
             if isinstance(highlight_introns2, str):
-                highlight_introns2 = {_str_to_pos(highlight_introns2)}
-            else:
-                highlight_introns2 = {_str_to_pos(i) for i in highlight_introns2}
+                highlight_introns2 = {_str_to_pos(i) for i in highlight_introns2.split(',')}
 
         if highlight_transcripts is not None and isinstance(highlight_transcripts, str):
             highlight_transcripts = [highlight_transcripts]
@@ -602,7 +596,7 @@ class Gene(object):
                         x, y = get_vertices(match[0], match[1], utr5=utr5, utr3=utr3)
                         y = i + scale*y
                         ax.add_patch(patches.PathPatch(mpath.Path(np.c_[x, y], closed=False), ec='none', lw=0,
-                                                       fc=highlight_color,
+                                                       fc=match[2] if len(match) > 2 else highlight_color,
                                                        zorder=3, clip_on=clip_on))
 
                 # ev = np.ones(e.end_pos-e.start_pos+1)  # height
