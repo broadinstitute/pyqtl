@@ -124,7 +124,7 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
         for k in colorbar:
             i = k // nc  # row
             j = k - i*nc  # col
-            cax.append(fig.add_axes([(dl+sum(aw[:j+1])+j*dx+ds)/fw, (db+(nr-i)*ah+(nr-i-1)*dy-ch-ct)/fh, cw/fw, ch/fh]))
+            cax.append(fig.add_axes([(dl+sum(aw[:j+1])+j*dx+ds)/fw, (db+sum(ah[::-1][:nr-i])+(nr-i-1)*dy-ch-ct)/fh, cw/fw, ch/fh]))
     elif colorbar == True:
         cax = fig.add_axes([(dl+sum(aw)+(nc-1)*dx+ds)/fw, (db+nr*ah+(nr-1)*dy-ch-ct)/fh, cw/fw, ch/fh])
     else:
