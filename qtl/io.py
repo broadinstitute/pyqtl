@@ -14,16 +14,17 @@ def to_bgzip(df, path, header=True, float_format=None):
     subprocess.check_call(f"tabix -f {path}", shell=True)
 
 
-def sort_bed(bed_df, inplace=True):
+def sort_bed(bed_df, inplace=True, reset_index=True):
     """Sort BED DataFrame"""
     sorted_df = bed_df.sort_values(['chr', 'start', 'end'], key=lambda x:
                     x.str.replace('chr','').str.replace('X','23').astype(int) if x.dtype == object else x,
                     inplace=inplace)
-    if inplace:
-        bed_df.reset_index(drop=True, inplace=True)
-    else:
-        sorted_df.reset_index(drop=True, inplace=True)
+    if not inplace:
+        if reset_index:
+            sorted_df.reset_index(drop=True, inplace=True)
         return sorted_df
+    elif reset_index:
+        bed_df.reset_index(drop=True, inplace=True)
 
 
 def write_bed(bed_df, output_name, header=True, float_format=None):
@@ -41,7 +42,7 @@ def read_gct(gct_file, sample_ids=None, dtype=None, load_description=True, skipr
     if sample_ids is not None:
         sample_ids = ['Name'] + list(sample_ids)
 
-    if gct_file.endswith('.gct.gz') or gct_file.endswith('.gct'):
+    if gct_file.endswith(('.gct', '.gct.gz')):
         if dtype is not None:
             with gzip.open(gct_file, 'rt') as gct:
                 for _ in range(skiprows):
