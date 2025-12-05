@@ -1092,7 +1092,7 @@ class Annotation(object):
         return self.cassette_transcripts
 
 
-    def get_junctions(self, min_intron_length=0, exclude_biotypes=[]):
+    def get_junctions(self, min_intron_length=0, group_shared=True, fasta_dict=None, exclude_biotypes=[]):
         """Return DataFrame with junction information: chr, intron_start, intron_end"""
         junctions = []
         for g in self.genes:
@@ -1103,10 +1103,29 @@ class Annotation(object):
                             junctions.append([g.chr, t.exons[i].end_pos+1, t.exons[i+1].start_pos-1, g.strand, g.id])
                         else:
                             junctions.append([g.chr, t.exons[i+1].end_pos+1, t.exons[i].start_pos-1, g.strand, g.id])
-        df = pd.DataFrame(junctions, columns=['chr', 'intron_start', 'intron_end', 'strand', 'gene_id']).drop_duplicates()
+        junctions_df = pd.DataFrame(junctions, columns=['chr', 'intron_start', 'intron_end', 'strand', 'gene_id']).drop_duplicates()
         # sort within chrs
-        df = df.groupby('chr', sort=False).apply(lambda x: x.sort_values(['intron_start', 'intron_end'])).reset_index(drop=True)
-        return df
+        junctions_df = junctions_df.groupby('chr', sort=False).apply(lambda x: x.sort_values(['intron_start', 'intron_end']), include_groups=False).reset_index(drop=True)
+
+        if group_shared:  # group junctions that are shared between genes
+            junctions_df = junctions_df.groupby(['chr', 'intron_start', 'intron_end', 'strand'], sort=False).apply(
+                lambda x: ','.join(x['gene_id']), include_groups=False).rename('gene_id').to_frame().reset_index()
+
+        if fasta_dict is not None:  # add junction motifs
+            motifs = []
+            for k,(_,r) in enumerate(junctions_df.iterrows(), 1):
+                if k % 1000 == 0 or k == len(junctions_df):
+                    print(f"\rParsing {k}/{len(junctions_df)}", end='')
+                if r['strand'] == '+':
+                    donor = fasta_dict[r['chr']][r['intron_start']-1:r['intron_start']+1]
+                    acceptor = fasta_dict[r['chr']][r['intron_end']-2:r['intron_end']]
+                else:
+                    acceptor = str(Seq(fasta_dict[r['chr']][r['intron_start']-1:r['intron_start']+1]).reverse_complement())
+                    donor = str(Seq(fasta_dict[r['chr']][r['intron_end']-2:r['intron_end']]).reverse_complement())
+                motifs.append(f"{donor}/{acceptor}")
+            junctions_df.insert(4, 'motif', motifs)
+
+        return junctions_df
 
 
     def get_junction_ids(self, min_intron_length=0):
