@@ -1104,8 +1104,9 @@ class Annotation(object):
                         else:
                             junctions.append([g.chr, t.exons[i+1].end_pos+1, t.exons[i].start_pos-1, g.strand, g.id])
         junctions_df = pd.DataFrame(junctions, columns=['chr', 'intron_start', 'intron_end', 'strand', 'gene_id']).drop_duplicates()
+
         # sort within chrs
-        junctions_df = junctions_df.groupby('chr', sort=False).apply(lambda x: x.sort_values(['intron_start', 'intron_end']), include_groups=False).reset_index(drop=True)
+        junctions_df = junctions_df.groupby('chr', sort=False)[junctions_df.columns].apply(lambda x: x.sort_values(['intron_start', 'intron_end'])).reset_index(drop=True)
 
         if group_shared:  # group junctions that are shared between genes
             junctions_df = junctions_df.groupby(['chr', 'intron_start', 'intron_end', 'strand'], sort=False).apply(
@@ -1138,9 +1139,9 @@ class Annotation(object):
 
         id2gene = defaultdict()
         junction_ids = []
-        for c in annot.chr_list:
+        for c in self.chr_list:
             idset  = set()  # chr.-specific set to preserve chr. order
-            for g in annot.chr_genes[c]:
+            for g in self.chr_genes[c]:
                 for t in g.transcripts:
                     if len(t.exons) > 1:
                         if g.strand == '+':
