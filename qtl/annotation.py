@@ -432,14 +432,20 @@ class Gene(object):
         if highlight_exons is not None:
             if isinstance(highlight_exons, str):
                 highlight_exons = {_str_to_pos(i) for i in highlight_exons.split(',')}
+            else:
+                highlight_exons = {_str_to_pos(i) for i in highlight_exons}
 
         if highlight_introns is not None:
             if isinstance(highlight_introns, str):
                 highlight_introns = {_str_to_pos(i) for i in highlight_introns.split(',')}
+            else:
+                highlight_introns = {_str_to_pos(i) for i in highlight_introns}
 
         if highlight_introns2 is not None:
             if isinstance(highlight_introns2, str):
                 highlight_introns2 = {_str_to_pos(i) for i in highlight_introns2.split(',')}
+            else:
+                highlight_introns2 = {_str_to_pos(i) for i in highlight_introns2}
 
         if highlight_transcripts is not None and isinstance(highlight_transcripts, str):
             highlight_transcripts = [highlight_transcripts]

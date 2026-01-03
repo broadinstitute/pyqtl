@@ -192,7 +192,7 @@ def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=No
 
 def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive', junctions_df=None,
          title=None, plot_variants=None, annot_track=None, max_intron=300, alpha=1, lw=0.5, junction_alpha=0.5, junction_lw=2,
-         highlight_introns=None, highlight_introns2=None, shade_range=None, colors=None, junction_colors=None,
+         highlight_introns=None, highlight_introns2=None, shade_regions=None, colors=None, junction_colors=None,
          ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
          pc_color='k', nc_color='darkgray', show_cds=True,
          dl=0.75, aw=4.5, dr=0.75, db=0.5, ah=1.5, dt=0.25, ds=0.2):
@@ -215,20 +215,18 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     if mappability_bigwig is not None:
         fh += da2
 
+    gtlabel_dict = {}
     if variant_id is not None:
         chrom, pos, ref, alt = variant_id.split('_')[:4]
         pos = int(pos)
-        if np.issubdtype(pileup_dfs[0].columns.dtype, np.integer):  # assume that inputs are genotypes
-            gtlabels = np.array([
-                f'{ref}:{ref}',
-                f'{ref}:{alt}',
-                f'{alt}:{alt}',
-            ])
-        else:
-            gtlabels = None
+        if np.issubdtype(pileup_dfs[0].columns.dtype, np.integer):  # infer that inputs are genotypes
+            gtlabel_dict = {
+                0: f'{ref}:{ref}',
+                1: f'{ref}:{alt}',
+                2: f'{alt}:{alt}',
+            }
     else:
         pos = None
-        gtlabels = None
 
     if pileup_dfs[0].shape[1] <= 3:
         cycler_colors = [
@@ -274,9 +272,9 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
                         c = colors[i]
                     else:
                         c = cycler_colors[j]
-                    ax.plot(xi, pileup_dfs[k][i], color=c, label=i, lw=lw, alpha=alpha, rasterized=rasterized)
+                    ax.plot(xi, pileup_dfs[k][i], color=c, label=gtlabel_dict.get(i, i), lw=lw, alpha=alpha, rasterized=rasterized)
                 else:
-                    ax.fill_between(xi, pileup_dfs[k][i], label=i, alpha=alpha, rasterized=rasterized)
+                    ax.fill_between(xi, pileup_dfs[k][i], label=gtlabel_dict.get(i, i), alpha=alpha, rasterized=rasterized)
 
     if labels is None:
         labels = ['Mean RPM'] * num_pileups
@@ -294,18 +292,14 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         ax.set_xlim(xlim)
     if ymax is not None:
         ax.set_ylim([0, ymax])
-    if gtlabels is not None:
-        gtlabels = gtlabels[sorder]
-    handles, _ = axv[-1].get_legend_handles_labels()
-    # leg = axv[-1].legend(handles[::-1], gtlabels[::-1], loc='upper left', handlelength=0.75, handletextpad=0.5, bbox_to_anchor=(1.02,1),
-    #                      labelspacing=0.2, borderaxespad=0, fontsize=10)
-    leg = axv[-1].legend(handles[::-1], gtlabels[::-1], loc='lower left', handlelength=0.75, handletextpad=0.5,
-                         labelspacing=0.2, borderaxespad=None, fontsize=10)#, framealpha=1)#, facecolor=(1, 0, 1, 0))
 
+    handles, legend_labels = axv[-1].get_legend_handles_labels()
+    leg = axv[-1].legend(handles[::-1], legend_labels[::-1], loc='upper left', handlelength=0.75, handletextpad=0.5, bbox_to_anchor=(1.02,1),
+                         labelspacing=0.2, borderaxespad=0, fontsize=10)
     for line in leg.get_lines():
         line.set_linewidth(1.5)
 
-    if plot_variants is not None and len(plot_variants) > 1:
+    if plot_variants is not None and not isinstance(plot_variants, str) and len(plot_variants) > 1:
         axv[-1].add_artist(leg)#, clip_on=False)
 
     if variant_id is not None and title is None:
@@ -314,14 +308,14 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         axv[-1].set_title(title, fontsize=11)
 
     # plot variant(s)
-    def _plot_variant(x, color='tab:red'):
+    def _plot_variant(x, color='tab:red', ec='k', **kwargs):
         for ax in axv:
             xlim = np.diff(ax.get_xlim())[0]
             ylim = np.diff(ax.get_ylim())[0]
-            h = 0.04 * ylim
+            h = 0.075 * ylim
             b = h/np.sqrt(3) * ah/aw * xlim/ylim
             v = np.array([[x-b, -h-0.01*ylim], [x+b, -h-0.01*ylim], [x, -0.01*ylim]])
-            ax.add_patch(patches.Polygon(v, closed=True, color=color, ec='k', lw=0.5, clip_on=False, zorder=10))
+            ax.add_patch(patches.Polygon(v, closed=True, color=color, ec=ec, lw=0.5, clip_on=False, zorder=10, **kwargs))
 
     if isinstance(plot_variants, str):
         x = gene.map_pos(int(plot_variants.split('_')[1]))
@@ -338,7 +332,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         x = gene.map_pos(pos)
         _plot_variant(x)
 
-    if plot_variants is not None:
+    if plot_variants is not None and not isinstance(plot_variants, str) and len(plot_variants) > 1:
         kwargs = {'ec':'k', 'lw':0.5, 's':20, 'marker':'^'}
         h1 = ax.scatter(np.nan, np.nan, fc='tab:red', **kwargs, label='Lead')
         h2 = ax.scatter(np.nan, np.nan, fc='tab:orange', **kwargs, label='Other')
@@ -349,14 +343,15 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     ax.set_ylim([0, ax.get_ylim()[1]])
 
     # plot highlight/shading
-    if shade_range is not None:
-        if isinstance(shade_range, str):
-            shade_range = shade_range.split(':')[-1].split('-')
-        shade_range = np.array(shade_range).astype(int)
-        shade_range = gene.map_pos(shade_range)
-        for k in range(len(shade_range)-1):
-            axv[-1].add_patch(patches.Rectangle((shade_range[k], 0), shade_range[k+1]-shade_range[k], ax.get_ylim()[1],
-                              facecolor=[0.8]*3 if k % 2 == 0 else [0.9]*3, zorder=-10))
+    if shade_regions is not None:
+        for region, color in shade_regions.items():
+            if isinstance(region, str):
+                if ':' in region:
+                    region = list(map(int, region.split(':')[1].split('-')))
+                else:
+                    region = list(map(int, region.split('-')))
+            start, end = gene.map_pos(region)
+            axv[-1].add_patch(patches.Rectangle((start, 0), end-start, ax.get_ylim()[1], facecolor=color, zorder=-10))
 
     # add gene model
     gax = fig.add_axes([dl/fw, db/fh, aw/fw, da/fh], sharex=axv[0])
@@ -403,6 +398,9 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         junctions_df = junctions_df.copy()
         junctions_df['start'] = junctions_df.index.map(lambda x: int(x.split(':')[-1].split('-')[0]))
         junctions_df['end'] = junctions_df.index.map(lambda x: int(x.split(':')[-1].split('-')[1]))
+        # filter junctions by start/end of coverage
+        junctions_df = junctions_df[(junctions_df['start'] >= pileup_dfs[0].index[0])
+                                    & (junctions_df['end'] <= pileup_dfs[0].index[-1])]
         for k,i in enumerate(sorder):
             s = pileup_dfs[0][i].copy()
             if junction_colors is not None:
