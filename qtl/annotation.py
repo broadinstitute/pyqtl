@@ -259,6 +259,26 @@ class Transcript(object):
 
         return s
 
+    def calculate_psi(self, exon_number, junctions_df):
+        """
+        Calculate PSI (percent spliced in) for the selected exon using
+        exon-exon junction counts. The junctions to the neighboring exons
+        and the junction between those exons must be present in junctions_df.
+        """
+        exons = self.exons[exon_number-2:exon_number+1]
+        if self.gene.strand == '-':
+            exons = exons[::-1]
+        chrom = self.gene.chr
+        excl_junc = f"{chrom}:{exons[0].end_pos+1}-{exons[2].start_pos-1}"
+        incl_junc = [f"{chrom}:{exons[0].end_pos+1}-{exons[1].start_pos-1}",
+                     f"{chrom}:{exons[1].end_pos+1}-{exons[2].start_pos-1}"]
+        num_s = junctions_df.loc[incl_junc].mean()
+        den_s = num_s + junctions_df.loc[excl_junc]
+        psi_s = num_s / den_s
+        psi_s.name = 'psi'
+
+        return psi_s
+
 
 class Gene(object):
     def __init__(self, gene_id, gene_name, gene_type, chrom, strand, start_pos, end_pos, transcript_list=None):
