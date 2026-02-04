@@ -232,6 +232,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
             ax = fig.add_axes([dl/fw, (offset+i*(ds2+ahs))/fh, aw/fw, ahs/fh], sharex=axv[0] if axv else None)
             axv.append(ax)
             axs.append(ax)
+        axs = axs[::-1]  # plot top to bottom
         offset += nscores*ahs + (nscores-1)*ds2 + ds
     # mappability track
     if mappability_bigwig is not None:
@@ -427,7 +428,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         mpax.set_ylim([0,1])
         plt.sca(axv[0])
 
-    xlim = gene.map_pos([pileup_dfs[0].index[0], pileup_dfs[0].index[-1]])
+    if xlim is None:
+        xlim = gene.map_pos([pileup_dfs[0].index[0], pileup_dfs[0].index[-1]])
     ax.set_xlim(xlim)
 
     if scores_df is not None:
