@@ -141,6 +141,15 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
     return r
 
 
+def shared_y_label(axes, ylabel, offset=0.04, fontsize=12):
+    bbox = np.vstack([ax.get_position().bounds for ax in axes])
+    x0 = bbox[:, 0].min()
+    y0 = bbox[:, 1].min()
+    y1 = (bbox[:, 1] + bbox[:, 3]).max()
+    y_center = (y0 + y1) / 2
+    axes[0].figure.text(x0-offset, y_center, ylabel, fontsize=fontsize, va="center", ha="right", rotation="vertical")
+
+
 def hide_ticks(ax, axis='both'):
     if axis in ['x', 'both']:
         plt.setp(ax.get_xticklabels(), visible=False)
