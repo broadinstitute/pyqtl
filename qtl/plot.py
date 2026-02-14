@@ -62,7 +62,7 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
 
 def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
                x_offset=6, y_offset=6, margins=None, polar=False,
-               background_axes=False,
+               background_axes=False, skip=[],
                dl=0.5, aw=2, dx=0.75, dr=0.25,
                db=0.5, ah=2, dy=0.75, dt=0.25,
                colorbar=None, ds=0.15, cw=0.15, ct=0, ch=None,
@@ -95,13 +95,14 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
     for j in range(nr):
         for i in range(si(j), nc):
             if n < ntot:
-                ax = fig.add_axes([(dl+sum(aw[:i])+i*dx)/fw, (db+sum(ah[::-1][:nr-j-1])+(nr-j-1)*dy)/fh, aw[i]/fw, ah[j]/fh], facecolor='none', zorder=0, polar=polar[n],
-                                  sharex=axes[0] if sharex and n>0 else None,
-                                  sharey=axes[0] if sharey and n>0 else None)
-                if not polar[n]:
-                    format_plot(ax, fontsize=fontsize, hide=hide, x_offset=x_offset, y_offset=y_offset)
-                ax.margins(margins)
-                axes.append(ax)
+                if n not in skip:
+                    ax = fig.add_axes([(dl+sum(aw[:i])+i*dx)/fw, (db+sum(ah[::-1][:nr-j-1])+(nr-j-1)*dy)/fh, aw[i]/fw, ah[j]/fh], facecolor='none', zorder=0, polar=polar[n],
+                                      sharex=axes[0] if sharex and n>0 else None,
+                                      sharey=axes[0] if sharey and n>0 else None)
+                    if not polar[n]:
+                        format_plot(ax, fontsize=fontsize, hide=hide, x_offset=x_offset, y_offset=y_offset)
+                    ax.margins(margins)
+                    axes.append(ax)
                 n += 1
 
     # add axes in background for plotting overlays
