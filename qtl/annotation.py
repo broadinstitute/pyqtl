@@ -453,7 +453,7 @@ class Gene(object):
             if isinstance(highlight_exons, str):
                 highlight_exons = {_str_to_pos(i) for i in highlight_exons.split(',')}
             else:
-                highlight_exons = {_str_to_pos(i) for i in highlight_exons}
+                highlight_exons = {_str_to_pos(i) if isinstance(i, str) else i for i in highlight_exons}
 
         if highlight_introns is not None:
             if isinstance(highlight_introns, str):
