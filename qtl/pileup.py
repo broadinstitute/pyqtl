@@ -464,7 +464,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
                 ec = junction_colors[i]
             else:
                 ec = cycler_colors[k]
-            gene.plot_junctions(ax, junctions_df, s, show_counts=False, align='minimum', count_col=i,
+            gene.plot_junctions(axv[0], junctions_df, s, show_counts=False, align='minimum', count_col=i,
                                 h=0.3, lw=junction_lw, lw_fct=np.sqrt, ec=ec, alpha=junction_alpha, clip_on=True)
 
     return axv
