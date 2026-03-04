@@ -193,14 +193,14 @@ def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=No
 
 def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive', junctions_df=None,
          title=None, plot_variants=None, annot_track=None, scores_df=None, scores_colors=None, max_intron=300, alpha=1, lw=0.5, junction_alpha=0.5, junction_lw=2,
-         highlight_introns=None, highlight_introns2=None, shade_regions=None, colors=None, junction_colors=None,
+         highlight_introns=None, highlight_introns2=None, shade_regions=None, colors=['#0374B3', '#C84646', '#C69B3A'], junction_colors=None,
          ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
          pc_color='k', nc_color='darkgray', show_cds=True,
          dl=0.75, aw=4.5, dr=0.75, db=0.5, ah=1.5, dt=0.25, ds=0.2):
     """
       pileup_dfs:
     """
-    if junction_colors is None and colors is not None:
+    if junction_colors is None:
         junction_colors = colors
 
     if isinstance(pileup_dfs, pd.DataFrame):
@@ -248,62 +248,55 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         axv.append(ax)
     axv = axv[::-1]
 
-    # set up labels
-    gtlabel_dict = {}
+    # parse order
+    s = pileup_dfs[0].sum()
+    if order == 'additive':  # assumes columns are dosages
+        # print(s)
+        # assert s.sort_index().equals(s), f"TEST"  # e.g., [0, 1, 2]
+        if s[s.index[0]] < s[s.index[-1]]:
+            order = s.index.tolist()[::-1]  # plot dosage with highest coverage first
+        else:
+            order = s.index.tolist()
+    elif order == 'sorted':
+        order = np.argsort(s)[::-1]
+    elif order == 'none' or order is None:
+        order = s.index
+    assert all([i in s for i in order])
+
+    # if variant_id is provided and inputs are dosages, rename
     if variant_id is not None:
         chrom, pos, ref, alt = variant_id.split('_')[:4]
         pos = int(pos)
         if np.issubdtype(pileup_dfs[0].columns.dtype, np.integer):  # infer that inputs are genotypes
-            gtlabel_dict = {
-                0: f'{ref}:{ref}',
-                1: f'{ref}:{alt}',
-                2: f'{alt}:{alt}',
-            }
+            gtlabel_dict = {0: f'{ref}:{ref}', 1: f'{ref}:{alt}', 2: f'{alt}:{alt}'}
+            pileup_dfs = [df.rename(columns=gtlabel_dict) for df in pileup_dfs]
+            order = [gtlabel_dict[i] for i in order]
     else:
         pos = None
 
     # set colors
-    if pileup_dfs[0].shape[1] <= 3:
-        cycler_colors = [
-            # hsv_to_rgb([0.55, 0.75, 0.8]),  #(0.2, 0.65, 0.8),  # blue
-            # hsv_to_rgb([0.08, 1, 1]),  #(1.0, 0.5, 0.0),   # orange
-            # hsv_to_rgb([0.3, 0.7, 0.7]),  #(0.2, 0.6, 0.17),  # green
-            '#0374B3',  # blue
-            '#C84646',  # red
-            '#C69B3A',  # gold
-        ]
-    else:
+    if pileup_dfs[0].shape[1] <= 3 and isinstance(colors, list):
+        cycler_colors = colors  # default: blue, red, gold
+    else:  # use tab10 colors
         cycler_colors = [rgb2hex(i) for i in plt.cm.tab10(np.arange(10))]
     custom_cycler = cycler('color', cycler_colors)
     for i in range(num_pileups):
         axv[i].set_prop_cycle(custom_cycler)
 
-    s = pileup_dfs[0].sum()
-    if isinstance(order, list):
-        sorder = order
-    elif order == 'additive':
-        sorder = s.index
-        if s[sorder[0]] < s[sorder[-1]]:
-            sorder = sorder[::-1]
-    elif order == 'sorted':
-        sorder = np.argsort(s)[::-1]
-    elif order == 'none':
-        sorder = s.index
-
     # plot pileups
     gene.set_plot_coords(max_intron=max_intron)
     for k,ax in enumerate(axv[:num_pileups]):
         xi = gene.map_pos(pileup_dfs[k].index)
-        for j,i in enumerate(sorder):
+        for j,i in enumerate(order):
             if i in pileup_dfs[k]:
                 if outline:
-                    if colors is not None:
+                    if colors is not None and isinstance(colors, (dict, pd.Series)):
                         c = colors[i]
                     else:
                         c = cycler_colors[j]
-                    ax.plot(xi, pileup_dfs[k][i], color=c, label=gtlabel_dict.get(i, i), lw=lw, alpha=alpha, rasterized=rasterized)
+                    ax.plot(xi, pileup_dfs[k][i], color=c, label=i, lw=lw, alpha=alpha, rasterized=rasterized)
                 else:
-                    ax.fill_between(xi, pileup_dfs[k][i], label=gtlabel_dict.get(i, i), alpha=alpha, rasterized=rasterized)
+                    ax.fill_between(xi, pileup_dfs[k][i], label=i, alpha=alpha, rasterized=rasterized)
 
     if labels is None:
         labels = ['Mean RPM'] * num_pileups
@@ -458,9 +451,9 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         # filter junctions by start/end of coverage
         junctions_df = junctions_df[(junctions_df['start'] >= pileup_dfs[0].index[0])
                                     & (junctions_df['end'] <= pileup_dfs[0].index[-1])]
-        for k,i in enumerate(sorder):
+        for k,i in enumerate(order):
             s = pileup_dfs[0][i].copy()
-            if junction_colors is not None:
+            if junction_colors is not None and isinstance(junction_colors, (dict, pd.Series)):
                 ec = junction_colors[i]
             else:
                 ec = cycler_colors[k]
