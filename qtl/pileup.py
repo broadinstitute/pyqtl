@@ -194,7 +194,7 @@ def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=No
 def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive', junctions_df=None,
          title=None, plot_variants=None, annot_track=None, scores_df=None, scores_colors=None, max_intron=300, alpha=1, lw=0.5, junction_alpha=0.5, junction_lw=2,
          highlight_introns=None, highlight_introns2=None, shade_regions=None, colors=['#0374B3', '#C84646', '#C69B3A'], junction_colors=None,
-         ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
+         legend_loc='upper left', bbox_to_anchor=(1.02,1), ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
          pc_color='k', nc_color='darkgray', show_cds=True,
          dl=0.75, aw=4.5, dr=0.75, db=0.5, ah=1.5, dt=0.25, ds=0.2):
     """
@@ -264,6 +264,7 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     assert all([i in s for i in order])
 
     # if variant_id is provided and inputs are dosages, rename
+    gtlabel_dict = None
     if variant_id is not None:
         chrom, pos, ref, alt = variant_id.split('_')[:4]
         pos = int(pos)
@@ -317,8 +318,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
 
     # legend for pileups
     handles, legend_labels = axv[0].get_legend_handles_labels()
-    leg = axv[0].legend(handles[::-1], legend_labels[::-1], loc='upper left', handlelength=0.75, handletextpad=0.5, bbox_to_anchor=(1.02,1),
-                         labelspacing=0.2, borderaxespad=0, fontsize=10)
+    leg = axv[0].legend(handles[::-1], legend_labels[::-1], loc=legend_loc, handlelength=0.75, handletextpad=0.5, bbox_to_anchor=bbox_to_anchor,
+                        labelspacing=0.2, borderaxespad=0, fontsize=10)
     for line in leg.get_lines():
         line.set_linewidth(1.5)
 
@@ -448,6 +449,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         junctions_df = junctions_df.copy()
         junctions_df['start'] = junctions_df.index.map(lambda x: int(x.split(':')[-1].split('-')[0]))
         junctions_df['end'] = junctions_df.index.map(lambda x: int(x.split(':')[-1].split('-')[1]))
+        junctions_df.rename(columns=gtlabel_dict, inplace=True)
+
         # filter junctions by start/end of coverage
         junctions_df = junctions_df[(junctions_df['start'] >= pileup_dfs[0].index[0])
                                     & (junctions_df['end'] <= pileup_dfs[0].index[-1])]
