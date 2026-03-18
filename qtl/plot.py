@@ -142,13 +142,30 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
     return r
 
 
-def shared_y_label(axes, ylabel, offset=0.04, fontsize=12):
+def shared_y_label(axes, ylabel, default_offset=0.04, fontsize=12):
+    fig = axes[0].figure
+    fig.canvas.draw()
+
+    label_bboxes = []
+    for ax in axes:
+        label = ax.yaxis.label
+        if label.get_text():
+            label_bboxes.append(label.get_window_extent(renderer=fig.canvas.get_renderer()))
+
+    if label_bboxes:
+        # transform to figure coordinates
+        bboxes_fig = [bbox.transformed(fig.transFigure.inverted()) for bbox in label_bboxes]
+        x0 = min(bbox.x0 for bbox in bboxes_fig)  # select leftmost
+    else:
+        bbox = np.vstack([ax.get_position().bounds for ax in axes])
+        x0 = bbox[:, 0].min() - default_offset
+
     bbox = np.vstack([ax.get_position().bounds for ax in axes])
-    x0 = bbox[:, 0].min()
     y0 = bbox[:, 1].min()
     y1 = (bbox[:, 1] + bbox[:, 3]).max()
     y_center = (y0 + y1) / 2
-    axes[0].figure.text(x0-offset, y_center, ylabel, fontsize=fontsize, va="center", ha="right", rotation="vertical")
+
+    fig.text(x0, y_center, ylabel, fontsize=fontsize, va="center", ha="left", rotation="vertical")
 
 
 def hide_ticks(ax, axis='both'):
