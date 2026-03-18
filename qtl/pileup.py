@@ -191,7 +191,7 @@ def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=No
     return df
 
 
-def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive', junctions_df=None,
+def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive', junction_dfs=None,
          title=None, plot_variants=None, annot_track=None, scores_df=None, scores_colors=None, max_intron=300, alpha=1, lw=0.5, junction_alpha=0.5, junction_lw=2,
          highlight_introns=None, highlight_introns2=None, shade_regions=None, colors=['#0374B3', '#C84646', '#C69B3A'], junction_colors=None,
          legend_loc='upper left', bbox_to_anchor=(1.02,1), ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
@@ -206,6 +206,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     if isinstance(pileup_dfs, pd.DataFrame):
         pileup_dfs = [pileup_dfs]
     num_pileups = len(pileup_dfs)
+    if isinstance(junction_dfs, pd.DataFrame):
+        junction_dfs = [junction_dfs]
 
     # gene model axes
     nt = len(gene.transcripts)
@@ -250,18 +252,21 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
 
     # parse order
     s = pileup_dfs[0].sum()
-    if order == 'additive':  # assumes columns are dosages
-        # print(s)
-        # assert s.sort_index().equals(s), f"TEST"  # e.g., [0, 1, 2]
-        if s[s.index[0]] < s[s.index[-1]]:
-            order = s.index.tolist()[::-1]  # plot dosage with highest coverage first
-        else:
-            order = s.index.tolist()
-    elif order == 'sorted':
-        order = np.argsort(s)[::-1]
-    elif order == 'none' or order is None:
-        order = s.index
-    assert all([i in s for i in order])
+    if len(s) > 1:
+        if order == 'additive':  # assumes columns are dosages
+            # assert s.sort_index().equals(s), f"TEST"  # e.g., [0, 1, 2]
+            if s[s.index[0]] < s[s.index[-1]]:
+                order = s.index.tolist()[::-1]  # plot dosage with highest coverage first
+            else:
+                order = s.index.tolist()
+        elif order == 'sorted':
+            order = np.argsort(s)[::-1]
+        elif order == 'none' or order is None:
+            order = s.index
+        assert all([i in s for i in order])
+    else:  # single tracks
+        assert all([pileup_df.shape[1] == 1 for pileup_df in pileup_dfs])
+        order = [pileup_df.columns[0] for pileup_df in pileup_dfs]
 
     # if variant_id is provided and inputs are dosages, rename
     gtlabel_dict = None
@@ -290,14 +295,14 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         xi = gene.map_pos(pileup_dfs[k].index)
         for j,i in enumerate(order):
             if i in pileup_dfs[k]:
+                if colors is not None and isinstance(colors, (dict, pd.Series)):
+                    c = colors[i]
+                else:
+                    c = cycler_colors[j]
                 if outline:
-                    if colors is not None and isinstance(colors, (dict, pd.Series)):
-                        c = colors[i]
-                    else:
-                        c = cycler_colors[j]
                     ax.plot(xi, pileup_dfs[k][i], color=c, label=i, lw=lw, alpha=alpha, rasterized=rasterized)
                 else:
-                    ax.fill_between(xi, pileup_dfs[k][i], label=i, alpha=alpha, rasterized=rasterized)
+                    ax.fill_between(xi, pileup_dfs[k][i], color=c, label=i, alpha=alpha, rasterized=rasterized)
 
     if labels is None:
         labels = ['Mean RPM'] * num_pileups
@@ -314,14 +319,22 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     if xlim is not None:
         axv[0].set_xlim(xlim)
     if ymax is not None:
-        axv[0].set_ylim([0, ymax])
+        for k in range(num_pileups):
+            axv[k].set_ylim([0, ymax])
 
     # legend for pileups
-    handles, legend_labels = axv[0].get_legend_handles_labels()
-    leg = axv[0].legend(handles[::-1], legend_labels[::-1], loc=legend_loc, handlelength=0.75, handletextpad=0.5, bbox_to_anchor=bbox_to_anchor,
-                        labelspacing=0.2, borderaxespad=0, fontsize=10)
-    for line in leg.get_lines():
-        line.set_linewidth(1.5)
+    if pileup_dfs[0].shape[1] > 1:
+        handles, legend_labels = axv[0].get_legend_handles_labels()
+        leg = axv[0].legend(handles[::-1], legend_labels[::-1], loc=legend_loc, handlelength=0.75, handletextpad=0.5, bbox_to_anchor=bbox_to_anchor,
+                            labelspacing=0.2, borderaxespad=0, fontsize=10)
+        for line in leg.get_lines():
+            line.set_linewidth(1.5)
+    else:
+        for k, pileup_df in enumerate(pileup_dfs):
+            axv[k].text(1.02, 0.5, pileup_df.columns[0], ha='left', va='center', fontsize=10, transform=axv[k].transAxes)
+        qtl_plot.shared_y_label(axv[:num_pileups], labels[0], fontsize=12)
+        for k in range(num_pileups):
+            axv[k].set_ylabel(None)
 
     if plot_variants is not None and not isinstance(plot_variants, str) and len(plot_variants) > 1:
         axv[0].add_artist(leg)#, clip_on=False)
@@ -445,22 +458,25 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     #     tax.tick_params(length=0, labelbottom=False)
 
     # plot last since in a separate set of axes
-    if junctions_df is not None:
-        junctions_df = junctions_df.copy()
-        junctions_df['start'] = junctions_df.index.map(lambda x: int(x.split(':')[-1].split('-')[0]))
-        junctions_df['end'] = junctions_df.index.map(lambda x: int(x.split(':')[-1].split('-')[1]))
-        junctions_df.rename(columns=gtlabel_dict, inplace=True)
+    if junction_dfs is not None:
+        for k, junctions_df in enumerate(junction_dfs):
+            junctions_df = junctions_df.copy()
+            junctions_df['start'] = junctions_df.index.map(lambda x: int(x.split(':')[-1].split('-')[0]))
+            junctions_df['end'] = junctions_df.index.map(lambda x: int(x.split(':')[-1].split('-')[1]))
+            if gtlabel_dict is not None:
+                junctions_df.rename(columns=gtlabel_dict, inplace=True)
 
-        # filter junctions by start/end of coverage
-        junctions_df = junctions_df[(junctions_df['start'] >= pileup_dfs[0].index[0])
-                                    & (junctions_df['end'] <= pileup_dfs[0].index[-1])]
-        for k,i in enumerate(order):
-            s = pileup_dfs[0][i].copy()
-            if junction_colors is not None and isinstance(junction_colors, (dict, pd.Series)):
-                ec = junction_colors[i]
-            else:
-                ec = cycler_colors[k]
-            gene.plot_junctions(axv[0], junctions_df, s, show_counts=False, align='minimum', count_col=i,
-                                h=0.3, lw=junction_lw, lw_fct=np.sqrt, ec=ec, alpha=junction_alpha, clip_on=True)
+            # filter junctions by start/end of coverage
+            junctions_df = junctions_df[(junctions_df['start'] >= pileup_dfs[0].index[0])
+                                        & (junctions_df['end'] <= pileup_dfs[0].index[-1])]
+            for k,i in enumerate(order):
+                if i in junctions_df:
+                    s = pileup_dfs[k][i].copy()
+                    if junction_colors is not None and isinstance(junction_colors, (dict, pd.Series)):
+                        ec = junction_colors[i]
+                    else:
+                        ec = cycler_colors[k]
+                    gene.plot_junctions(axv[k], junctions_df, s, show_counts=False, align='minimum', count_col=i,
+                                        h=0.3, lw=junction_lw, lw_fct=np.sqrt, ec=ec, alpha=junction_alpha, clip_on=True)
 
     return axv
