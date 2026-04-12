@@ -187,6 +187,7 @@ def get_uniprot_features(protein_id, transcript=None, fasta_dict=None, fasta=Non
     features_df = pd.DataFrame(data['features'])
     features_df.insert(2, 'aa_start', features_df['location'].apply(lambda x: x['start']['value']))
     features_df.insert(3, 'aa_end', features_df['location'].apply(lambda x: x['end']['value']))
+    features_df.insert(4, 'aa_sequence', features_df.apply(lambda r: data['sequence']['value'][r['aa_start']-1:r['aa_end']], axis=1))
 
     if transcript is not None:
         # add genomic coordinates
@@ -220,8 +221,8 @@ def map_features_to_exons(features_df, transcript):
     intervals_df = []
     for e in transcript.exons:
         for r in itree.find(e.start_pos, e.end_pos):
-            intervals_df.append([np.maximum(e.start_pos, r['g_start']), np.minimum(e.end_pos, r['g_end']), r['description']])
-    intervals_df = pd.DataFrame(intervals_df, columns=['start', 'end', 'description'])
+            intervals_df.append([np.maximum(e.start_pos, r['g_start']), np.minimum(e.end_pos, r['g_end']), r['description'], transcript.id])
+    intervals_df = pd.DataFrame(intervals_df, columns=['start', 'end', 'description', 'transcript_id'])
     return intervals_df
 
 
@@ -594,9 +595,6 @@ class Gene(object):
             else:
                 highlight_exons = {_str_to_pos(i) if isinstance(i, str) else i for i in highlight_exons}
 
-        if domains_df is not None:
-            highlight_exons = [(r['start'], r['end'], r['color']) for _,r in domains_df.iterrows()]
-
         if highlight_introns is not None:
             if isinstance(highlight_introns, str):
                 highlight_introns = {_str_to_pos(i) for i in highlight_introns.split(',')}
@@ -763,6 +761,15 @@ class Gene(object):
                         ax.add_patch(patches.PathPatch(mpath.Path(np.c_[x, y], closed=False), ec='none', lw=0,
                                                        fc=match[2] if len(match) > 2 else highlight_color,
                                                        zorder=3, clip_on=clip_on))
+
+                if domains_df is not None:
+                    for _,r in domains_df[(domains_df['transcript_id'] == e.transcript.id)
+                                          & (e.start_pos <= domains_df['start'])
+                                          & (domains_df['end'] <= e.end_pos)].iterrows():
+                        x, y = get_vertices(r['start'], r['end'], utr5=utr5, utr3=utr3)
+                        y = i + scale*y
+                        ax.add_patch(patches.PathPatch(mpath.Path(np.c_[x, y], closed=False), ec='none', lw=0,
+                                                       fc=r['color'], zorder=3, clip_on=clip_on))
 
                 # ev = np.ones(e.end_pos-e.start_pos+1)  # height
                 # ev[utr[e.start_pos-t.start_pos:e.end_pos-t.start_pos+1] == 1] = 0.5  # UTRs
