@@ -4,8 +4,10 @@ import os
 import tempfile
 import copy
 import subprocess
+import requests
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.transforms as mtransforms
 import matplotlib.path as mpath
 from matplotlib.colors import hsv_to_rgb
 import gzip
@@ -106,6 +108,124 @@ def _str_to_pos(region_str):
     return int(s), int(e)
 
 
+def get_uniprot_ids(gene_symbol=None, transcript_id=None, organism="Homo sapiens"):
+    """
+    Get UniProt protein IDs given a HGNC gene symbol and/or Ensembl transcript ID.
+
+    Parameters
+    ----------
+        gene_symbol : str
+            HGNC gene symbol (e.g., TP53)
+        transcript_id : str
+            Ensembl transcript ID (e.g., ENST00000269305)
+        organism : str
+            Organism name (default: Homo sapiens)
+
+    Returns
+    -------
+        list: UniProt accession IDs
+    """
+    if not gene_symbol and not transcript_id:
+        raise ValueError("Provide at least gene_symbol or transcript_id")
+
+    query = []
+    if gene_symbol:
+        query.append(f"gene:{gene_symbol}")
+    if transcript_id:
+        query.append(f"xref:ensembl-{transcript_id}")
+    if organism:
+        query.append(f'organism_name:"{organism}"')
+    query = " AND ".join(query)
+
+    response = requests.get("https://rest.uniprot.org/uniprotkb/search",
+                            params={"query": query, "fields": "accession,sequence,xref_ensembl", "format": "json"})
+    response.raise_for_status()
+    data = response.json()
+
+    uniprot_ids = {}
+    for entry in data.get("results", []):
+        uniprot_ids[entry["primaryAccession"]] = {
+            'length': entry['sequence']['length'],
+            'transcript_ids': list({i['id'] for i in entry['uniProtKBCrossReferences'] if i['database'] == 'Ensembl'})
+        }
+
+    return uniprot_ids
+
+
+def get_uniprot_features(protein_id, transcript=None, fasta_dict=None, fasta=None, verbose=True):
+    """Get UniProt feature annotations"""
+    if verbose:
+        print(f"Fetching UniProt domain annotations for {protein_id}")
+    response = requests.get(f"https://rest.uniprot.org/uniprotkb/{protein_id}.json",
+                            headers={"Accept": "application/json"})
+    assert response.status_code == 200
+    data = response.json()
+    del data['references']
+
+    assert len(data['genes']) == 1
+    gene_name = data['genes'][0]['geneName']['value']
+    protein_name = data['proteinDescription']['recommendedName']['fullName']['value']
+    if verbose:
+        print(f"  * Gene name: {gene_name}")
+        print(f"  * Protein name: {protein_name}")
+
+    if transcript is not None:
+        # check transcript ID
+        cand = [i for i in data['uniProtKBCrossReferences'] if i['database'] == 'Ensembl']
+        if cand:
+            assert any([i['id'] == transcript.id for i in cand])
+        elif verbose:
+            print(f"  ** Warning: no Ensembl cross-references")
+        if fasta_dict or fasta:  # check AA sequence
+            s = transcript.get_sequence(feature='cds', fasta_dict=fasta_dict, fasta=fasta)
+            assert len(data['sequence']['value']) == len(Seq(s).translate())
+            mismatches = [(k, i, j) for k,(i,j) in enumerate(zip(data['sequence']['value'], Seq(s).translate()), 1) if i != j]
+            if mismatches and verbose:
+                print(f"  ** Warning: AA sequences match lengths, but contain {len(mismatches)} mismatches.")
+            # assert Seq(s).translate() == data['sequence']['value']
+
+    features_df = pd.DataFrame(data['features'])
+    features_df.insert(2, 'aa_start', features_df['location'].apply(lambda x: x['start']['value']))
+    features_df.insert(3, 'aa_end', features_df['location'].apply(lambda x: x['end']['value']))
+
+    if transcript is not None:
+        # add genomic coordinates
+        coords = transcript.get_cds_coords(include_stop=False)
+        if fasta_dict or fasta:
+            assert len(coords) == len(s)
+        starts_dict = dict(zip(range(1, len(coords)//3+1), coords[::3]))
+        ends_dict = dict(zip(range(1, len(coords)//3+1), coords[2::3]))
+        if transcript.gene.strand == '+':
+            features_df.insert(4, 'g_start', features_df['aa_start'].map(starts_dict))
+            features_df.insert(5, 'g_end', features_df['aa_end'].map(ends_dict))
+        else:
+            features_df.insert(4, 'g_start', features_df['aa_end'].map(ends_dict))
+            features_df.insert(5, 'g_end', features_df['aa_start'].map(starts_dict))
+
+    return features_df, protein_name
+
+
+def map_features_to_exons(features_df, transcript):
+    """
+    Map protein annotations (e.g., domains from UniProt) to exon coordinates
+
+    features_df : pd.DataFrame
+        Dataframe with columns g_start, g_end, description
+    transcript : qtl.annotation.Transcript
+    """
+    itree = IntervalTree()
+    for _,r in features_df.iterrows():
+        itree.add(r['g_start'], r['g_end']+1, r)
+
+    intervals_df = []
+    for e in transcript.exons:
+        for r in itree.find(e.start_pos, e.end_pos):
+            intervals_df.append([np.maximum(e.start_pos, r['g_start']), np.minimum(e.end_pos, r['g_end']), r['description']])
+    intervals_df = pd.DataFrame(intervals_df, columns=['start', 'end', 'description'])
+    return intervals_df
+
+
+
 class Exon(object):
     """Exon"""
     def __init__(self, exon_id, number, transcript, start_pos, end_pos):
@@ -183,7 +303,7 @@ class Transcript(object):
         return cds_ranges
 
     def get_cds_coords(self, include_stop=True):
-        """Get genomic coordinates of coding sequence, including stop codon."""
+        """Get genomic coordinates of coding sequence (in direction of transcription), with or without stop codon."""
         cds_ranges = self.get_cds_ranges(include_stop=include_stop)
         if self.gene.strand == '+':
             return np.concatenate([np.arange(r[0], r[1]+1) for r in cds_ranges])
@@ -411,13 +531,32 @@ class Gene(object):
              highlight_region=None, highlight_region_color='tab:red',
              highlight_pos=None, highlight_pos_color='tab:orange',
              pc_color=[0.6, 0.88, 1], nc_color='#aaaaaa', ec=[0, 0.7, 1], wx=0.05, reference=None, ylabels='id',
-             highlight_exons=None, exon_colors=None, highlight_introns=None, highlight_introns2=None,
+             domains_df=None, highlight_exons=None, show_biotype=True,
+             highlight_introns=None, highlight_introns2=None,
              highlight_color='tab:red', clip_on=False, yoffset=0, xlim=None,
              highlight_transcripts=None, exclude_biotypes=[]):
         """
         Plots the transcript structure of the gene.
 
+
+        Example
+        -------
+        Plot gene with selected protein domains highlighted
+
+            gene = annot.get_gene('NRAS')
+            transcript = gene.transcripts[0]
+            # qtl.annotation.get_uniprot_ids("NRAS", transcript.id) --> P01111
+            features_df, _ = qtl.annotation.get_uniprot_features('P01111', transcript=transcript, verbose=False)
+            features_df = features_df[features_df['type'] == 'Binding site']
+            features_df['description'] = 'GTP binding'
+            domains_df = qtl.annotation.map_features_to_exons(features_df, annot.get_gene('NRAS').transcripts[0])
+            domains_df['color'] = domains_df['description'].map({"GTP binding": "tab:orange"})
+            ax = gene.plot(domains_df=domains_df, show_biotype=False, pc_color='lightgray')
+
+        Parameters
+        ----------
         highlight_introns : (list of) string(s) defining intron coordinates (first to last base of intron)
+        domains_df : pd.DataFrame with columns start, end, description, color
         """
 
         transcripts = [t for t in self.transcripts if t.type not in exclude_biotypes]
@@ -454,6 +593,9 @@ class Gene(object):
                 highlight_exons = {_str_to_pos(i) for i in highlight_exons.split(',')}
             else:
                 highlight_exons = {_str_to_pos(i) if isinstance(i, str) else i for i in highlight_exons}
+
+        if domains_df is not None:
+            highlight_exons = [(r['start'], r['end'], r['color']) for _,r in domains_df.iterrows()]
 
         if highlight_introns is not None:
             if isinstance(highlight_introns, str):
@@ -615,10 +757,7 @@ class Gene(object):
                                                zorder=2, clip_on=clip_on))
 
                 if highlight_exons is not None:
-                    match = [i for i in highlight_exons if e.start_pos <= i[0] and i[1] <= e.end_pos]
-                    if match:
-                        assert len(match) == 1
-                        match = match[0]
+                    for match in [i for i in highlight_exons if e.start_pos <= i[0] and i[1] <= e.end_pos]:
                         x, y = get_vertices(match[0], match[1], utr5=utr5, utr3=utr3)
                         y = i + scale*y
                         ax.add_patch(patches.PathPatch(mpath.Path(np.c_[x, y], closed=False), ec='none', lw=0,
@@ -683,6 +822,14 @@ class Gene(object):
             if mane_transcript is not None:
                 ax.get_yticklabels()[yticklabels.index(getattr(mane_transcript, ylabels))].set_color('tab:red')
 
+        # add domains legend
+        if domains_df is not None:
+            for _,r in domains_df[['description', 'color']].drop_duplicates().iterrows():
+                ax.scatter(np.nan, np.nan, c=r['color'], marker='s', label=r['description'])
+            transform = ax.transAxes + mtransforms.ScaledTranslation(0.33, 0, ax.figure.dpi_scale_trans)
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), bbox_transform=transform,
+                      title='Domains', title_fontsize=10, handlelength=1, handletextpad=0.5)
+
         if not axes_input:
             start_pos = np.min([t.start_pos for t in self.transcripts if t.type not in self.exclude_biotypes])
             end_pos = np.max([t.end_pos for t in self.transcripts if t.type not in self.exclude_biotypes])
@@ -691,12 +838,14 @@ class Gene(object):
             ax.set_xticklabels([f"{start_pos:,}", f"{end_pos:,}"], ha='center', fontsize=9)
         #     ax.set_xticks(self.map_pos(np.array([self.start_pos, self.end_pos])))
         #     ax.set_xticklabels([self.start_pos, self.end_pos], ha='center', fontsize=9)
-            # add transcript type label
-            ax2 = ax.twinx()
-            ax2.set_ylim([-0.6, i+0.6])
-            ax2.set_yticks(range(len(transcripts)))
-            ax2.set_yticklabels([t.type.replace('_', ' ').capitalize() for t in transcripts[::-1]], ha='left', fontsize=9)
-            format_plot(ax2, tick_length=4, hide=['top', 'left', 'right'])
+
+            if show_biotype:  # add transcript type label
+                ax2 = ax.twinx()
+                ax2.set_ylim([-0.6, i+0.6])
+                ax2.set_yticks(range(len(transcripts)))
+                ax2.set_yticklabels([t.type.replace('_', ' ').capitalize() for t in transcripts[::-1]], ha='left', fontsize=9)
+                format_plot(ax2, tick_length=4, hide=['top', 'left', 'right'])
+
             format_plot(ax, tick_length=4, hide=['top', 'left', 'right'])
 
         if coverage is not None:
