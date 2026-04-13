@@ -215,7 +215,6 @@ def get_interpro_features(protein_id, transcript=None, verbose=False):
     assert response.status_code == 200
     data = response.json()['results']
     assert all([d['proteins'][0]['accession'] == protein_id.lower() for d in data])
-    # return data
 
     features_df = pd.DataFrame(data)
     for k, c in enumerate(['type', 'name'], 1):

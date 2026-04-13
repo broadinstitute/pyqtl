@@ -9,6 +9,7 @@ from collections.abc import Iterable
 import multiprocessing as mp
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.transforms as mtransforms
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import hsv_to_rgb, rgb2hex
 import seaborn as sns
@@ -193,8 +194,8 @@ def group_pileups(pileups_df, libsize_s, variant_id, genotypes, covariates_df=No
 
 def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='additive', junction_dfs=None,
          title=None, plot_variants=None, annot_track=None, scores_df=None, scores_colors=None, max_intron=300, alpha=1, lw=0.5, junction_alpha=0.5, junction_lw=2,
-         highlight_introns=None, highlight_introns2=None, shade_regions=None, colors=['#0374B3', '#C84646', '#C69B3A'], junction_colors=None,
-         legend_loc='upper left', bbox_to_anchor=(1.02,1), ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
+         domains_df=None, highlight_introns=None, highlight_introns2=None, shade_regions=None, colors=['#0374B3', '#C84646', '#C69B3A'], junction_colors=None,
+         legend_loc='upper left', dlegend=0.1, ymax=None, xlim=None, rasterized=False, outline=False, labels=None,
          pc_color='k', nc_color='darkgray', show_cds=True,
          dl=0.75, aw=4.5, dr=0.75, db=0.5, ah=1.5, dt=0.25, ds=0.2):
     """
@@ -325,7 +326,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
     # legend for pileups
     if pileup_dfs[0].shape[1] > 1:
         handles, legend_labels = axv[0].get_legend_handles_labels()
-        leg = axv[0].legend(handles[::-1], legend_labels[::-1], loc=legend_loc, handlelength=0.75, handletextpad=0.5, bbox_to_anchor=bbox_to_anchor,
+        leg = axv[0].legend(handles[::-1], legend_labels[::-1], loc=legend_loc, handlelength=0.75, handletextpad=0.5,
+                            bbox_to_anchor=(1, 1), bbox_transform=axv[0].transAxes + mtransforms.ScaledTranslation(dlegend, 0, gax.figure.dpi_scale_trans),
                             labelspacing=0.2, borderaxespad=0, fontsize=10)
         for line in leg.get_lines():
             line.set_linewidth(1.5)
@@ -376,7 +378,8 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
         h2 = ax.scatter(np.nan, np.nan, fc='tab:orange', **kwargs, label='Other')
         if len(plot_variants) > 1:
             ax.legend(handles=[h1,h2], loc='lower left', title='CS variants',
-                      handlelength=1, handletextpad=0.5, borderaxespad=0, bbox_to_anchor=(1.02, 0))
+                      handlelength=1, handletextpad=0.5, borderaxespad=0,
+                      bbox_to_anchor=(1, 0), bbox_transform=ax.transAxes + mtransforms.ScaledTranslation(dlegend, 0, gax.figure.dpi_scale_trans))
     ax.set_ylim([0, ax.get_ylim()[1]])
 
     # plot highlight/shading
@@ -404,9 +407,13 @@ def plot(pileup_dfs, gene, mappability_bigwig=None, variant_id=None, order='addi
             #                   facecolor=[0.8]*3 if k % 2 == 0 else [0.9]*3, zorder=-10))
 
     # add gene model
-    gene.plot(ax=gax, max_intron=max_intron, wx=0.2, highlight_introns=highlight_introns,
+    gene.plot(ax=gax, max_intron=max_intron, wx=0.2, domains_df=domains_df, highlight_introns=highlight_introns,
               highlight_introns2=highlight_introns2, ec='none', clip_on=True,
               pc_color=pc_color, nc_color=nc_color, show_cds=show_cds)
+    if domains_df is not None:
+        gax.legend(loc='lower left', borderaxespad=0, bbox_to_anchor=(1, 0),
+                   bbox_transform=gax.transAxes + mtransforms.ScaledTranslation(dlegend, 0, gax.figure.dpi_scale_trans),
+                   title='Domains', title_fontsize=10, handlelength=1, handletextpad=0.5)
     gax.set_title('')
 
     if nt < 3:
