@@ -206,6 +206,46 @@ def get_uniprot_features(protein_id, transcript=None, fasta_dict=None, fasta=Non
     return features_df, protein_name
 
 
+def get_interpro_features(protein_id, transcript=None, verbose=False):
+    """Get InterPro feature annotations"""
+    if verbose:
+        print(f"Fetching InterPro domain annotations for {protein_id}")
+    response = requests.get(f"https://www.ebi.ac.uk/interpro/api/entry/interpro/protein/uniprot/{protein_id}/",
+                            headers={"Accept": "application/json"})
+    assert response.status_code == 200
+    data = response.json()['results']
+    assert all([d['proteins'][0]['accession'] == protein_id.lower() for d in data])
+    # return data
+
+    features_df = pd.DataFrame(data)
+    for k, c in enumerate(['type', 'name'], 1):
+        features_df.insert(k, c, features_df['metadata'].apply(lambda x: x[c]))
+
+    assert (features_df['proteins'].apply(len) == 1).all()
+    features_df['proteins'] = features_df['proteins'].apply(lambda x: x[0])
+    # assert features_df['proteins'].apply(lambda x: len(['entry_protein_locations']) == 1).all()
+
+    features_df.insert(3, 'aa_start', features_df['proteins'].apply(
+        lambda x: [i['fragments'][0]['start'] for i in x['entry_protein_locations']]))
+    features_df.insert(4, 'aa_end', features_df['proteins'].apply(
+        lambda x: [i['fragments'][0]['end'] for i in x['entry_protein_locations']]))
+    features_df = features_df.explode(['aa_start', 'aa_end'])
+    features_df.rename(columns={'name': 'description'}, inplace=True)
+
+    if transcript is not None:
+        coords = transcript.get_cds_coords(include_stop=False)
+        starts_dict = dict(zip(range(1, len(coords)//3+1), coords[::3]))
+        ends_dict = dict(zip(range(1, len(coords)//3+1), coords[2::3]))
+        if transcript.gene.strand == '+':
+            features_df.insert(4, 'g_start', features_df['aa_start'].map(starts_dict))
+            features_df.insert(5, 'g_end', features_df['aa_end'].map(ends_dict))
+        else:
+            features_df.insert(4, 'g_start', features_df['aa_end'].map(ends_dict))
+            features_df.insert(5, 'g_end', features_df['aa_start'].map(starts_dict))
+
+    return features_df
+
+
 def map_features_to_exons(features_df, transcript):
     """
     Map protein annotations (e.g., domains from UniProt) to exon coordinates
