@@ -168,6 +168,31 @@ def shared_y_label(axes, ylabel, default_offset=0.04, fontsize=12):
     fig.text(x0, y_center, ylabel, fontsize=fontsize, va="center", ha="left", rotation="vertical")
 
 
+def shared_x_label(axes, xlabel, default_offset=0.04, fontsize=12):
+    fig = axes[0].figure
+    fig.canvas.draw()
+
+    label_bboxes = []
+    for ax in axes:
+        label = ax.xaxis.label
+        if label.get_text():
+            label_bboxes.append(label.get_window_extent(renderer=fig.canvas.get_renderer()))
+
+    if label_bboxes:
+        # transform to figure coordinates
+        bboxes_fig = [bbox.transformed(fig.transFigure.inverted()) for bbox in label_bboxes]
+        y0 = min(bbox.y0 for bbox in bboxes_fig)  # select lowest
+    else:
+        bbox = np.vstack([ax.get_position().bounds for ax in axes])
+        y0 = bbox[:, 1].min() - default_offset
+
+    bbox = np.vstack([ax.get_position().bounds for ax in axes])
+    x0 = bbox[:, 0].min()
+    x1 = (bbox[:, 0] + bbox[:, 2]).max()
+    x_center = (x0 + x1) / 2
+    fig.text(x_center, y0, xlabel, fontsize=fontsize, va="top", ha="center")
+
+
 def hide_ticks(ax, axis='both'):
     if axis in ['x', 'both']:
         plt.setp(ax.get_xticklabels(), visible=False)
