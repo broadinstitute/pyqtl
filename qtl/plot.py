@@ -915,7 +915,7 @@ class CohortLabel(object):
         else:
             self.values_s = cohort_s
 
-    def plot(self, ix=None, ax=None, show_frame=False):
+    def plot(self, ix=None, ax=None, show_frame=False, rasterized=False):
         if ax is None:
             ax, cax = setup_figure(2, 0.5, colorbar=True, ch=0.5)
             # ax, cax = setup_figure(0.5, 2, colorbar=True, ch=0.5)
@@ -932,7 +932,7 @@ class CohortLabel(object):
             x = x.reshape(1, -1)
         else:
             x = x.reshape(-1, 1)
-        h = ax.imshow(x, aspect='auto', cmap=self.cmap, interpolation='none', origin='lower')
+        h = ax.imshow(x, aspect='auto', cmap=self.cmap, interpolation='none', origin='lower', rasterized=rasterized)
         if width > height:
             if self.label_pos == 'left':
                 ax.set_ylabel(self.name, fontsize=10, rotation=0, va='center', ha='right')
