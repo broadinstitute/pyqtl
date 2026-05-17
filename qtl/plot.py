@@ -888,7 +888,7 @@ def qqplot(pval, pval_null=None, ntests=None, ntests_null=None, max_values=10000
 
 
 class CohortLabel(object):
-    def __init__(self, cohort_s, cmap=None, colors=None, label_pos='left', vmin=None, vmax=None, bad_color=None):
+    def __init__(self, cohort_s, cmap=None, norm=None, colors=None, label_pos='left', vmin=None, vmax=None, bad_color=None):
         assert cmap is not None or colors is not None
         assert not cohort_s.index.duplicated().any()
         if cohort_s.dtype == 'O':
@@ -903,6 +903,7 @@ class CohortLabel(object):
         self.name = cohort_s.name
         self.label_pos = label_pos
         self.colors = colors
+        self.norm = norm
 
         if cohort_s.dtype.name == 'category':
             # get numerical index
@@ -915,7 +916,7 @@ class CohortLabel(object):
         else:
             self.values_s = cohort_s
 
-    def plot(self, ix=None, ax=None, show_frame=False, rasterized=False):
+    def plot(self, ix=None, ax=None, show_frame=False, rasterized=False, colorbar=False):
         if ax is None:
             ax, cax = setup_figure(2, 0.5, colorbar=True, ch=0.5)
             # ax, cax = setup_figure(0.5, 2, colorbar=True, ch=0.5)
@@ -932,7 +933,7 @@ class CohortLabel(object):
             x = x.reshape(1, -1)
         else:
             x = x.reshape(-1, 1)
-        h = ax.imshow(x, aspect='auto', cmap=self.cmap, interpolation='none', origin='lower', rasterized=rasterized)
+        h = ax.imshow(x, aspect='auto', cmap=self.cmap, norm=self.norm, interpolation='none', origin='lower', rasterized=rasterized)
         if width > height:
             if self.label_pos == 'left':
                 ax.set_ylabel(self.name, fontsize=10, rotation=0, va='center', ha='right')
@@ -955,6 +956,17 @@ class CohortLabel(object):
         if self.cohort_s.dtype.name == 'category':
             for c in self.cohort_s.cat.categories:
                 ax.scatter(np.nan, np.nan, c=[self.colors[c]], label=c, s=30, marker='s')
+        elif colorbar:
+            fig = ax.figure
+            bbox = ax.get_position()
+            fw, fh = fig.get_size_inches()
+            # cax = fig.add_axes([bbox.x1 + 0.25/fw, bbox.y0, 1/fw, bbox.height])  # horizontal
+            # cb = fig.colorbar(h, cax=cax, orientation='horizontal')
+            cax = fig.add_axes([bbox.x1 + 0.75/fw, bbox.y1 - 0.5/fh, 0.1/fw, 0.5/fh])  # horizontal
+            cb = fig.colorbar(h, cax=cax, orientation='vertical')
+            return ax, cax
+
+        return ax
 
 
 def check_labels(labels):
