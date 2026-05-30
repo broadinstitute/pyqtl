@@ -579,7 +579,7 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, ld_bounds=None,
     db = 0.5
     ldh = 1  # LD plot
     ds0 = 0
-    ds = 0.1
+    ds = 0.05
     if pip_df is None:
         ph = 0
     elif isinstance(pip_df, pd.DataFrame):
@@ -691,10 +691,10 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, ld_bounds=None,
                     fax.scatter(gdf['position']/1e6, [i-1]*gdf.shape[0], s=30*gdf['pip'],
                                 color=pip_colors.get(category_id, 'k') if pip_colors is not None else 'k', edgecolor='none', clip_on=False)
                 if cdf.shape[0] > 0:
-                    fax.scatter(np.nan, np.nan, s=20, color=pip_colors.get(category_id, 'k') if pip_colors is not None else 'k', label=category_id, edgecolor='none')
-            fax.invert_yaxis()
+                    fax.scatter(np.nan, np.nan, s=20, color=pip_colors.get(category_id, 'k') if pip_colors is not None else 'k',
+                                label=category_id if pip_legend else None, edgecolor='none')
+            fax.set_ylim([len(traits)-0.5, -0.5])  # inverts axis
             fax.set_yticks(np.arange(len(traits)))
-
             fax.spines['bottom'].set_visible(False)
             fax.spines['top'].set_visible(False)
             fax.spines['left'].set_position(('outward', 6))
@@ -708,7 +708,8 @@ def plot_locus_summary(region_str, tracks_dict=None, ld_df=None, ld_bounds=None,
                 line.set_markeredgewidth(0)
 
             if pip_legend == True:
-                fax.legend(loc='upper left', borderaxespad=0, borderpad=0.25, bbox_to_anchor=(1.01,1), fontsize=8, handlelength=0.75, handletextpad=0.5, labelspacing=0)
+                fax.legend(loc='upper left', borderaxespad=0, borderpad=0.25, bbox_to_anchor=(1.01,1),
+                           fontsize=8, handlelength=0.75, handletextpad=0.5, labelspacing=0)
 
 
     if gene is not None:

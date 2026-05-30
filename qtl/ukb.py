@@ -1,9 +1,12 @@
 import pandas as pd
 import numpy as np
 import scipy as sp
+import scipy.signal
+import scipy.ndimage as ndimage
 import os
 import subprocess
 from . import io, liftover
+from . import plot as qtl_plot
 
 #------------------------------------------------------------------------------
 #  Helper functions for downloading, lifting over, and parsing UKB LD data
@@ -66,3 +69,29 @@ def load_ld(ld_file):
     m += m.T
     ld_df = pd.DataFrame(m, index=header_df['variant_id'], columns=header_df['variant_id'])
     return ld_df
+
+
+def get_ld_blocks(ld_df, plot=False):
+    """Identify LD blocks using method adapted from Berisa & Pickrell, 2015"""
+
+    M = np.rot90(ld_df)
+    d = np.array([np.trace(M, offset=i) for i in np.arange(-len(M)+1, len(M))])
+    dm = np.array([np.max(np.diag(M, i)) for i in np.arange(-len(M)+1, len(M))])
+    w = np.hanning(100)
+    w /= w.sum()
+    s = ndimage.convolve1d(d, w)
+
+    mask = ndimage.binary_closing(dm < 0.2, np.ones(31), border_value=1)
+    x = sp.signal.argrelmin(s)[0]
+    x = np.r_[0, x[mask[x]], len(s)-1]
+    ld_bounds = ld_df.index[np.round(x/2).astype(int)].map(lambda x: int(x.split('_')[1])).values
+
+    if plot:
+        ax = qtl_plot.setup_figure(8,1)
+        qtl_plot.format_plot(ax)
+        ax.margins(0)
+        ax.plot(d, alpha=0.5)
+        ax.plot(s)
+        ax.scatter(x, np.ones(len(x)), c='tab:red', zorder=2, clip_on=False)
+
+    return ld_bounds
