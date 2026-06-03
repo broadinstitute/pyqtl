@@ -917,7 +917,8 @@ class CohortLabel(object):
         else:
             self.values_s = cohort_s
 
-    def plot(self, ix=None, ax=None, show_frame=False, rasterized=False, colorbar=False):
+    def plot(self, ix=None, ax=None, cax=None, show_frame=False, rasterized=False, colorbar=False,
+             cbar_orientation='horizontal', cdl=0.25, cdt=0):
         if ax is None:
             ax, cax = setup_figure(2, 0.5, colorbar=True, ch=0.5)
             # ax, cax = setup_figure(0.5, 2, colorbar=True, ch=0.5)
@@ -958,13 +959,17 @@ class CohortLabel(object):
             for c in self.cohort_s.cat.categories:
                 ax.scatter(np.nan, np.nan, c=[self.colors[c]], label=c, s=30, marker='s')
         elif colorbar:
-            fig = ax.figure
-            bbox = ax.get_position()
-            fw, fh = fig.get_size_inches()
-            # cax = fig.add_axes([bbox.x1 + 0.25/fw, bbox.y0, 1/fw, bbox.height])  # horizontal
-            # cb = fig.colorbar(h, cax=cax, orientation='horizontal')
-            cax = fig.add_axes([bbox.x1 + 0.75/fw, bbox.y1 - 0.5/fh, 0.1/fw, 0.5/fh])  # horizontal
-            cb = fig.colorbar(h, cax=cax, orientation='vertical')
+            if cax is None:
+                fig = ax.figure
+                bbox = ax.get_position()
+                fw, fh = fig.get_size_inches()
+                aw = bbox.width * fw
+                ah = bbox.height * fh
+                if cbar_orientation == 'horizontal':
+                    cax = fig.add_axes([bbox.x1 + cdl/fw, bbox.y1-bbox.height-cdt/fh, 0.5/fw, bbox.height])  # horizontal
+                else:
+                    cax = fig.add_axes([bbox.x1 + 0.75/fw, bbox.y1 - 0.5/fh, 0.1/fw, 0.5/fh])  # vertical
+            cb = fig.colorbar(h, cax=cax, orientation=cbar_orientation)
             return ax, cax
 
         return ax
