@@ -251,7 +251,10 @@ def format_plot(ax, tick_direction='out', tick_length=4, hide=['top', 'right'],
         line.set_markersize(tick_length/2)
         line.set_markeredgewidth(lw/2)
 
-    ax.spines['left'].set_position(('outward', y_offset))
+    if ax.yaxis.get_ticks_position() == "left":
+        ax.spines['left'].set_position(('outward', y_offset))
+    else:
+        ax.spines['right'].set_position(('outward', y_offset))
     ax.spines['bottom'].set_position(('outward', x_offset))
 
     if equal_limits:
