@@ -189,19 +189,8 @@ def get_uniprot_features(protein_id, transcript=None, fasta_dict=None, fasta=Non
     features_df.insert(3, 'aa_end', features_df['location'].apply(lambda x: x['end']['value']))
     features_df.insert(4, 'aa_sequence', features_df.apply(lambda r: data['sequence']['value'][r['aa_start']-1:r['aa_end']], axis=1))
 
-    if transcript is not None:
-        # add genomic coordinates
-        coords = transcript.get_cds_coords(include_stop=False)
-        if fasta_dict or fasta:
-            assert len(coords) == len(s)
-        starts_dict = dict(zip(range(1, len(coords)//3+1), coords[::3]))
-        ends_dict = dict(zip(range(1, len(coords)//3+1), coords[2::3]))
-        if transcript.gene.strand == '+':
-            features_df.insert(4, 'g_start', features_df['aa_start'].map(starts_dict))
-            features_df.insert(5, 'g_end', features_df['aa_end'].map(ends_dict))
-        else:
-            features_df.insert(4, 'g_start', features_df['aa_end'].map(ends_dict))
-            features_df.insert(5, 'g_end', features_df['aa_start'].map(starts_dict))
+    if transcript is not None:  # add genomic coordinates
+        transcript.map_aa_to_g_coords(features_df, inplace=True)
 
     return features_df, protein_name
 
@@ -356,6 +345,22 @@ class Transcript(object):
             return np.array([j for i in [np.arange(e.start_pos, e.end_pos+1) for e in self.exons] for j in i])
         else:
             return np.array([j for i in [np.arange(e.start_pos, e.end_pos+1) for e in self.exons[::-1]] for j in i])[::-1]
+
+    def map_aa_to_g_coords(self, df, inplace=False):
+        """Map amino acid positions (in columns 'aa_start', 'aa_end') to genomic coordinates (in columns 'g_start' and 'g_end')"""
+        if not inplace:
+            df = df.copy()
+        coords = self.get_cds_coords(include_stop=False)
+        starts_dict = dict(zip(range(1, len(coords)//3+1), coords[::3]))
+        ends_dict = dict(zip(range(1, len(coords)//3+1), coords[2::3]))
+        if self.gene.strand == '+':
+            df.insert(4, 'g_start', df['aa_start'].map(starts_dict))
+            df.insert(5, 'g_end', df['aa_end'].map(ends_dict))
+        else:
+            df.insert(4, 'g_start', df['aa_end'].map(ends_dict))
+            df.insert(5, 'g_end', df['aa_start'].map(starts_dict))
+        if not inplace:
+            return df
 
     def get_sequence(self, feature='all', fasta_dict=None, fasta=None, include_stop=False):
         """Load transcript sequence from FASTA file"""
