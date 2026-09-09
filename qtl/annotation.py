@@ -876,7 +876,7 @@ class Gene(object):
         # add domains legend
         if domains_df is not None:
             for _,r in domains_df[['description', 'color']].drop_duplicates().iterrows():
-                ax.scatter(np.nan, np.nan, c=r['color'], marker='s', label=r['description'])
+                ax.scatter(np.nan, np.nan, color=r['color'], marker='s', label=r['description'])
             transform = ax.transAxes + mtransforms.ScaledTranslation(0.33, 0, ax.figure.dpi_scale_trans)
             ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), bbox_transform=transform,
                       title='Domains', title_fontsize=10, handlelength=1, handletextpad=0.5)
