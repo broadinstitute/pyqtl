@@ -266,9 +266,11 @@ class Exon(object):
         self.length = end_pos-start_pos+1
 
     def __str__(self, ref=1):
-        return f'exon_id: {self.id}; exon_number: {self.number:2d}'\
-            + f'; pos.: {self.start_pos-ref+1:d}-{self.end_pos-ref+1:d}'\
-            + f'; length: {self.length:d}'
+        return (
+            f"exon_id: {self.id}; exon_number: {self.number:2d}"
+            f"; pos.: {self.start_pos - ref + 1:d}-{self.end_pos - ref + 1:d}"
+            f"; length: {self.length:d}"
+        )
 
     def __len__(self):
         return self.length
@@ -309,10 +311,14 @@ class Transcript(object):
 
     def __str__(self, ref=1):
         """Print text representation of transcript structure"""
-        rep = [f'Transcript: {self.id} ({self.name}): {self.type}' +\
-            f'; {self.gene.chr}:{self.start_pos-ref+1:d}-{self.end_pos-ref+1:d} ({self.gene.strand})' +\
-            f'; length: {sum([e.length for e in self.exons]):d}']
-        rep += ['    '+i.__str__(ref) for i in self.exons]
+        rep = [
+            f"Transcript: {self.id} ({self.name}): {self.type}"
+            f"{' (MANE)' if self.is_mane() else ''}; "
+            f"{self.gene.chr}:{self.start_pos-ref + 1:d}-{self.end_pos - ref + 1:d} "
+            f"({self.gene.strand}); "
+            f"length: {sum(e.length for e in self.exons):d}"
+        ]
+        rep += ['    '+e.__str__(ref) for e in self.exons]
         return '\n'.join(rep)
 
     def __eq__(self, other):
@@ -361,6 +367,10 @@ class Transcript(object):
             df.insert(5, 'g_end', df['aa_start'].map(starts_dict))
         if not inplace:
             return df
+
+    def is_mane(self, mane_tag='MANE_Select'):
+        """Check whether the transcript is annotated as a MANE (Matched Annotation from NCBI and EBI) transcript"""
+        return hasattr(self, 'attributes') and 'tags' in self.attributes and mane_tag in self.attributes['tags']
 
     def get_sequence(self, feature='all', fasta_dict=None, fasta=None, include_stop=False):
         """Load transcript sequence from FASTA file"""
@@ -464,12 +474,15 @@ class Gene(object):
 
     def __str__(self, ref=1):
         """Print gene/isoform structure"""
-        rep = f'Gene: {self.name} ({self.id}): {self.type}; ' +\
-             f"{self.chr}:{self.start_pos-ref+1:d}-{self.end_pos-ref+1:d} ({self.strand})"
+        rep = (
+            f"Gene: {self.name} ({self.id}): {self.type}; "
+            f"{self.chr}:{self.start_pos - ref + 1:d}-{self.end_pos - ref + 1:d} "
+            f"({self.strand})"
+        )
         if len(self.transcripts) > 1:
-            rep = rep + f'; {len(self.transcripts)} isoforms'
+            rep += f"; {len(self.transcripts)} isoforms"
         if isinstance(self.mappability, float):
-            rep = rep + f'; Mappability: {self.mappability:.4f}'
+            rep += f"; Mappability: {self.mappability:.4f}"
         rep = [rep] + [i.__str__(ref) for i in self.transcripts]
         return '\n'.join(rep)
 
@@ -908,8 +921,8 @@ class Gene(object):
 
         return ax
 
-    def get_mane_transcript(self, tag='MANE_Select'):
-        mane_transcript = [t for t in self.transcripts if hasattr(t, 'attributes') and 'tags' in t.attributes and tag in t.attributes['tags']]
+    def get_mane_transcript(self):
+        mane_transcript = [t for t in self.transcripts if t.is_mane()]
         assert len(mane_transcript) <= 1
         if len(mane_transcript) == 1:
             return mane_transcript[0]
@@ -1168,7 +1181,7 @@ class Annotation(object):
             self.gene_interval_trees[g.chr].add(g.start_pos, g.end_pos+1, g)
             # add transcript lenghts
             for t in g.transcripts:
-                t.length = sum([e.length for e in t.exons])
+                t.length = sum(e.length for e in t.exons)
             # add annotation
             # g.annotation = self
 
