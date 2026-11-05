@@ -62,7 +62,7 @@ def setup_figure(aw=4.5, ah=3, xspace=[0.75,0.25], yspace=[0.75,0.25],
 
 def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
                x_offset=6, y_offset=6, margins=None, polar=False,
-               background_axes=False, skip=[],
+               background_axes=False, facecolor='none', skip=[],
                dl=0.5, aw=2, dx=0.75, dr=0.25,
                db=0.5, ah=2, dy=0.75, dt=0.25,
                colorbar=None, ds=0.15, cw=0.15, ct=0, ch=None,
@@ -83,7 +83,7 @@ def get_axgrid(nr, nc, ntot=None, sharex=False, sharey=False,
 
     fw = dl + sum(aw) + (nc-1)*dx + dr
     fh = db + sum(ah) + (nr-1)*dy + dt
-    fig = plt.figure(figsize=(fw,fh), facecolor='none')
+    fig = plt.figure(figsize=(fw,fh), facecolor=facecolor)
     axes = []
     n = 0
 
