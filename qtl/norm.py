@@ -126,14 +126,14 @@ def edger_calcnormfactors(counts_df, ref=None, logratio_trim=0.3,
     if np.any(allzero):
         Y = Y[~allzero,:]
 
+    N = np.sum(Y, axis=0)  # total reads in each library
+
     # select reference sample
     if ref is None:  # reference sample index
-        f75 = np.percentile(Y/np.sum(Y,axis=0), 75, axis=0)
+        f75 = np.percentile(Y, 75, axis=0) / N
         ref = np.argmin(np.abs(f75-np.mean(f75)))
         if verbose:
             print('Reference sample index: '+str(ref))
-
-    N = np.sum(Y, axis=0)  # total reads in each library
 
     # with np.errstate(divide='ignore'):
     with warnings.catch_warnings():
