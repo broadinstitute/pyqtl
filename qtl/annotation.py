@@ -641,7 +641,7 @@ class Gene(object):
                 ch = 0.6
                 fh += ch + 0.1
             fig = plt.figure(facecolor=(1,1,1), figsize=(fw,fh))
-            ax = fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh])
+            ax = fig.add_axes([dl/fw, db/fh, aw/fw, ah/fh], facecolor='none')
             ax.margins(x=0)
             if coverage is not None:
                 ac = fig.add_axes([dl/fw, (db+ah+0.1)/fh, aw/fw, ch/fh], sharex=ax)
